@@ -70,8 +70,10 @@ bool DisplayManager::begin(DisplayDriver* displayDriver) {
         return false;
     }
 
-    // Initialize UI system
+    // Initialize UI with display dimensions
+    ui.init(driver->width(), driver->height());
     ui.begin();
+    
     updateTimer = lv_timer_create(lvglTimerCallback, 100, this);
 
     initialized = true;

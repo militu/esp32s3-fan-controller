@@ -13,19 +13,22 @@
  ******************************************************************************/
 /**
  * @brief Manages the LVGL-based user interface for the fan controller display
- * 
- * Handles creation, updates, and management of all UI elements including:
- * - Temperature display with color-coded arc
- * - Fan speed indicators (current and target)
- * - Operation mode display
- * - System status indicators (WiFi, MQTT, Night mode)
  */
 class DisplayUI {
 public:
     /**
      * @brief Constructor - initializes all UI elements to nullptr
      */
-    DisplayUI();
+    DisplayUI();  // Just declaration, no implementation here
+
+
+    /**
+     * @brief Initializes display dimensions
+     */
+    void init(uint16_t width, uint16_t height) {
+        displayWidth = width;
+        displayHeight = height;
+    }
 
     /**
      * @brief Initializes the UI if not already initialized
@@ -53,13 +56,17 @@ public:
     lv_obj_t* getArc();
 
 private:
+    // display dimensions
+    uint16_t displayWidth;
+    uint16_t displayHeight;
+
     // UI Creation Methods
     void createUI();
     void createMainScreen();
-    void createLeftContainer();
-    void createTemperatureArc();
+    void createLeftContainer(uint16_t width, uint16_t height, uint16_t margin);
+    void createTemperatureArc(uint16_t size, uint16_t xPos);
     void createStatusIndicators();
-    void createRightContainer();
+    void createRightContainer(uint16_t width, uint16_t height, uint16_t margin);
 
     // Helper Methods for UI Creation
     lv_obj_t* createStatusLabel(lv_obj_t* parent, lv_align_t align, lv_coord_t x_ofs, 

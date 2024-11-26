@@ -31,13 +31,14 @@ public:
      * Constructor takes references to all required system components
      */
     DisplayManager(TempSensor& ts, FanController& fc, WifiManager& wm, MqttManager& mm);
-    
+
+
     /**
      * Initialize the display system with the provided driver
      * @param driver Pointer to display driver implementation
      * @return true if initialization successful
      */
-    bool begin(DisplayDriver* driver);
+    bool begin(DisplayDriver* displayDriver);
     
     /**
      * Main processing function, should be called in loop
