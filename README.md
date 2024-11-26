@@ -58,7 +58,7 @@ A fan controller system built with ESP32, featuring temperature-based control, M
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/yourusername/esp32-fan-controller.git
+   git clone https://github.com/militu/esp32-fan-controller.git
    ```
 
 2. Install PlatformIO (if not already installed)
