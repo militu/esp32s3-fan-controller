@@ -55,41 +55,38 @@ esp_err_t WifiManager::begin() {
 esp_err_t WifiManager::connect() {
     DEBUG_LOG("Connecting to WiFi SSID: %s\n", WIFI_SSID);
 
-    {
-        MutexGuard guard(mutex);
-        if (!guard.isLocked()) {
-            return ESP_ERR_TIMEOUT;
-        }
-        currentState = SystemState::WIFI_CONNECTING;
+    MutexGuard guard(mutex);
+    if (!guard.isLocked()) {
+        return ESP_ERR_TIMEOUT;
     }
+    
+    currentState = SystemState::WIFI_CONNECTING;
+    
+    // Use exponential backoff for retry delays
+    currentRetryDelay = WIFI_RETRY_DELAY;
     
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     
-    // Attempt connection with retry mechanism
     connectionAttempts = 0;
-    while (WiFi.status() != WL_CONNECTED && connectionAttempts < WIFI_MAX_RETRIES) {
-        DEBUG_LOG(".");
-        delay(WIFI_RETRY_DELAY);
+    while (connectionAttempts < WIFI_MAX_RETRIES) {
+        if (WiFi.status() == WL_CONNECTED) {
+            currentState = SystemState::WIFI_CONNECTED;
+            wasConnected = true;
+            currentRetryDelay = WIFI_RETRY_DELAY;  // Reset delay on success
+            DEBUG_LOG("WiFi connected! IP: %s", WiFi.localIP().toString().c_str());
+            return ESP_OK;
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(currentRetryDelay));
+        currentRetryDelay *= WIFI_BACKOFF_FACTOR;  // Exponential backoff
         connectionAttempts++;
+        DEBUG_LOG("Connection attempt %d failed, next delay: %lu ms", 
+                 connectionAttempts, currentRetryDelay);
     }
 
-    // Handle connection result
-    if (WiFi.status() == WL_CONNECTED) {
-        MutexGuard guard(mutex);
-        if (!guard.isLocked()) {
-            return ESP_ERR_TIMEOUT;
-        }
-        currentState = SystemState::WIFI_CONNECTED;
-        wasConnected = true;
-        
-        DEBUG_LOG("WiFi connected!");
-        DEBUG_LOG("IP address: %s\n", WiFi.localIP().toString().c_str());
-        return ESP_OK;
-    } else {
-        updateState(SystemState::WIFI_ERROR);
-        DEBUG_LOG("WiFi connection failed!");
-        return ESP_FAIL;
-    }
+    updateState(SystemState::WIFI_ERROR);
+    DEBUG_LOG("WiFi connection failed after max attempts");
+    return ESP_FAIL;
 }
 
 void WifiManager::processUpdate() {

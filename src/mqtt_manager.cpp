@@ -174,20 +174,19 @@ void MqttManager::connect() {
             }
         }
     }
-}void MqttManager::processUpdate() {
-    if (!initialized) {
-        DEBUG_LOG("MQTT not initialized");
-        return;
-    }
+}
 
-    if (!WiFi.isConnected()) {
-        DEBUG_LOG("WiFi not connected");
+void MqttManager::processUpdate() {
+    if (!initialized || !WiFi.isConnected()) {
+        DEBUG_LOG("WiFi not connected or mqtt not initialized");
+        vTaskDelay(pdMS_TO_TICKS(1000));  // Longer delay when not ready
         return;
     }
 
     // Handle client loop first
     unsigned long now = millis();
-    if (now - lastClientLoop >= 10) {  // Every 10ms
+    
+    if (now - lastClientLoop >= CLIENT_LOOP_INTERVAL) { 
         lastClientLoop = now;
         mqttClient.loop();  // Important: Handle MQTT client processing
     }
@@ -203,11 +202,9 @@ void MqttManager::connect() {
     processQueuedMessages();
 
     // Publish status periodically
-    if (now - lastStatusUpdate >= MQTT_UPDATE_INTERVAL) {
+    if (mqttClient.connected() && now - lastStatusUpdate >= MQTT_UPDATE_INTERVAL) {
         lastStatusUpdate = now;
-        if (mqttClient.connected()) {
-            publishStatus();
-        }
+        publishStatus();
     }
 
     bool needsReconnect = false;
@@ -300,10 +297,10 @@ void MqttManager::processQueuedMessages() {
     static uint32_t messageCount = 0;
     MQTTMessage msg;
     
-    while (xQueueReceive(messageQueue, &msg, 0) == pdTRUE) {
-        messageCount++;
+    while (messageCount < 5 && xQueueReceive(messageQueue, &msg, 0) == pdTRUE) {
         DEBUG_LOG("Processing message %lu from queue - Topic: %s", messageCount, msg.topic);
         handleMessage(msg.topic, (byte*)msg.payload, msg.payloadLength);
+        messageCount++;
     }
 }
 
@@ -314,7 +311,7 @@ void MqttManager::mqttTask(void* parameters) {
     while (true) {
         mqtt->taskManager.updateTaskRunTime("MQTT");
         mqtt->processUpdate();
-        vTaskDelay(pdMS_TO_TICKS(50));  // Run every 50ms instead of MQTT_UPDATE_INTERVAL
+        vTaskDelay(pdMS_TO_TICKS(100)); 
     }
 }
 

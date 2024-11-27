@@ -73,7 +73,8 @@ private:
     static constexpr uint32_t MQTT_STACK_SIZE = 8192;
     static constexpr UBaseType_t MQTT_TASK_PRIORITY = 3;
     static constexpr BaseType_t MQTT_TASK_CORE = 1;
-    static constexpr unsigned long AVAILABILITY_INTERVAL = 20000;  // 20 seconds
+    static constexpr unsigned long AVAILABILITY_INTERVAL = 30000;  // 30 seconds
+    static constexpr uint32_t CLIENT_LOOP_INTERVAL = 50; 
 
     // Message structure
     struct MQTTMessage {

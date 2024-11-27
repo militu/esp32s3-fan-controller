@@ -193,12 +193,28 @@ void FanController::processUpdate() {
 
 void FanController::fanTask(void* parameters) {
     FanController* fan = static_cast<FanController*>(parameters);
+    TickType_t lastRPMUpdate = xTaskGetTickCount();
+    TickType_t lastEventCheck = xTaskGetTickCount();
     
     while (true) {
         fan->taskManager.updateTaskRunTime("Fan");
-        fan->processEvents();      // Process any pending events
-        fan->processUpdate();      // Existing update logic
-        vTaskDelay(pdMS_TO_TICKS(RPM_UPDATE_INTERVAL));
+        
+        TickType_t now = xTaskGetTickCount();
+        
+        // Check events more frequently than RPM
+        if ((now - lastEventCheck) >= pdMS_TO_TICKS(EVENT_CHECK_INTERVAL)) {
+            fan->processEvents();
+            lastEventCheck = now;
+        }
+        
+        // Update RPM less frequently
+        if ((now - lastRPMUpdate) >= pdMS_TO_TICKS(RPM_UPDATE_INTERVAL)) {
+            fan->processUpdate();
+            lastRPMUpdate = now;
+        }
+        
+        // Shorter delay to allow more responsive event handling
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
 

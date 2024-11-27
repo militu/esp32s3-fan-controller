@@ -130,7 +130,9 @@ void DisplayManager::processLVGL() {
         
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(2));
     }
-}void DisplayManager::updateDisplayValues() {
+}
+
+void DisplayManager::updateDisplayValues() {
     if (!initialized) return;
 
     // Create a command with current state
