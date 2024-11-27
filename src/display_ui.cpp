@@ -192,20 +192,33 @@ lv_obj_t* DisplayUI::createInfoLabel(lv_obj_t* parent, lv_align_t align, lv_coor
 }
 
 void DisplayUI::updateTemperatureDisplay(float temp) {
-    // Update arc value
-    int arcValue = constrain((int)(temp * 2), 0, 100);
-    lv_arc_set_value(arc, arcValue);
+    int targetValue = constrain((int)(temp * 2), 0, 100);
     
+    // Create smooth animation
+    lv_anim_init(&arcAnim);
+    lv_anim_set_var(&arcAnim, arc);
+    lv_anim_set_exec_cb(&arcAnim, arcAnimCallback);
+    lv_anim_set_values(&arcAnim, currentArcValue, targetValue);
+    lv_anim_set_time(&arcAnim, 500);  // 500ms duration
+    lv_anim_set_path_cb(&arcAnim, lv_anim_path_ease_out);
+    lv_anim_start(&arcAnim);
+    
+    currentArcValue = targetValue;
+
     // Update temperature label
     char tempStr[32];
     snprintf(tempStr, sizeof(tempStr), "%.1f°C", temp);
     lv_label_set_text(tempLabel, tempStr);
 
-    // Update arc color based on temperature ranges
+    // Update arc color based on temperature
     lv_color_t tempColor = (temp < 30.0f) ? lv_color_hex(0x00FF00) :
                           (temp < 40.0f) ? lv_color_hex(0xFFA500) :
                                          lv_color_hex(0xFF0000);
     lv_obj_set_style_arc_color(arc, tempColor, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+}
+
+void DisplayUI::arcAnimCallback(void* var, int32_t value) {
+    lv_arc_set_value((lv_obj_t*)var, value);
 }
 
 void DisplayUI::updateStatusIndicators(bool wifiConnected, bool mqttConnected, bool nightMode) {

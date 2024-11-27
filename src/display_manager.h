@@ -59,7 +59,7 @@ private:
     // Update timing control
     lv_timer_t* updateTimer;
     uint32_t lastUpdate;
-    static constexpr uint32_t UPDATE_INTERVAL = 100;  // 100ms refresh rate
+    static constexpr uint32_t UPDATE_INTERVAL = 16;  // 100ms refresh rate
     
     // State tracking
     bool initialized;

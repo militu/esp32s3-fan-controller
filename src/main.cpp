@@ -55,18 +55,24 @@ void setup() {
  * Handles periodic system status checks and updates
  */
 void loop() {
+    static uint32_t lastDisplay = 0;
     static uint32_t lastCheck = 0;
+    uint32_t now = millis();
 
-    // Update display
-    displayManager.process();
+    // Update display more frequently
+    if (now - lastDisplay >= 5) {  // 200Hz refresh rate
+        displayManager.process();
+        lastDisplay = now;
+    }
 
-    // Perform system health check every 5 seconds
-    if (millis() - lastCheck >= 5000) {
-        lastCheck = millis();
+    // System health check less frequently
+    if (now - lastCheck >= 5000) {
+        lastCheck = now;
         performSystemHealthCheck();
     }
-    
-    delay(100);
+
+    // Allow other tasks to run
+    delay(1);
 }
 
 /**

@@ -45,15 +45,17 @@ bool DisplayManager::begin(DisplayDriver* displayDriver) {
 
     // Setup display buffer
     static uint32_t buf_size = driver->width() * 10;
-    static lv_color_t* buf = new lv_color_t[buf_size];
-    if (!buf) {
-        Serial.println("Failed to allocate display buffer!");
+    static lv_color_t* buf1 = new lv_color_t[buf_size];
+    static lv_color_t* buf2 = new lv_color_t[buf_size];
+    if (!buf1 || !buf2) {
+        Serial.println("Failed to allocate display buffers!");
         return false;
     }
 
     // Initialize LVGL display buffer
     static lv_disp_draw_buf_t draw_buf;
-    lv_disp_draw_buf_init(&draw_buf, buf, NULL, buf_size);
+    lv_disp_draw_buf_init(&draw_buf, buf1, buf2, buf_size);
+
 
     // Configure LVGL display driver
     static lv_disp_drv_t disp_drv;
@@ -74,7 +76,7 @@ bool DisplayManager::begin(DisplayDriver* displayDriver) {
     ui.init(driver->width(), driver->height());
     ui.begin();
     
-    updateTimer = lv_timer_create(lvglTimerCallback, 100, this);
+    updateTimer = lv_timer_create(lvglTimerCallback, 50, this);
 
     initialized = true;
     return true;
