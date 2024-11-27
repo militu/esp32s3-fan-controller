@@ -27,49 +27,31 @@
  */
 class DisplayManager {
 public:
-    /**
-     * Constructor takes references to all required system components
-     */
-    DisplayManager(TempSensor& ts, FanController& fc, WifiManager& wm, MqttManager& mm);
-
-
-    /**
-     * Initialize the display system with the provided driver
-     * @param driver Pointer to display driver implementation
-     * @return true if initialization successful
-     */
+    DisplayManager(TaskManager& tm, TempSensor& ts, FanController& fc, WifiManager& wm, MqttManager& mm);
     bool begin(DisplayDriver* displayDriver);
-    
-    /**
-     * Main processing function, should be called in loop
-     */
-    void process();
-    
+
 private:
-    // System component references
+    TaskManager& taskManager;
     TempSensor& tempSensor;
     FanController& fanController;
     WifiManager& wifiManager;
     MqttManager& mqttManager;
     
-    // Display components
     DisplayDriver* driver;
     DisplayUI ui;
-    
-    // Update timing control
-    lv_timer_t* updateTimer;
-    uint32_t lastUpdate;
-    static constexpr uint32_t UPDATE_INTERVAL = 16;  // 100ms refresh rate
-    
-    // State tracking
     bool initialized;
     
-    // LVGL callbacks
-    static void lvglTimerCallback(lv_timer_t* timer);
+    // LVGL task handling
+    static void lvglTask(void* parameters);
+    void processLVGL();
     static void flush_cb(lv_disp_drv_t* disp_drv, const lv_area_t* area, lv_color_t* color_p);
-    
-    // Internal update methods
     void updateDisplayValues();
+
+    // Constants
+    static constexpr uint32_t LVGL_STACK_SIZE = 4096;
+    static constexpr UBaseType_t LVGL_TASK_PRIORITY = 1;  // Higher than other tasks
+    static constexpr BaseType_t LVGL_TASK_CORE = 1;
+    static constexpr uint32_t UPDATE_INTERVAL = 10;  // 20Hz updates
 };
 
 #endif // DISPLAY_MANAGER_H

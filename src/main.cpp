@@ -30,7 +30,7 @@ MqttManager mqttManager(taskManager, tempSensor, fanController);
     ILI9341Driver display(ILI9341_CS_PIN, ILI9341_DC_PIN);
 #endif
 
-DisplayManager displayManager(tempSensor, fanController, wifiManager, mqttManager);
+DisplayManager displayManager(taskManager, tempSensor, fanController, wifiManager, mqttManager);
 
 // Function declarations
 void initializeComponents();
@@ -55,24 +55,16 @@ void setup() {
  * Handles periodic system status checks and updates
  */
 void loop() {
-    static uint32_t lastDisplay = 0;
     static uint32_t lastCheck = 0;
     uint32_t now = millis();
 
-    // Update display more frequently
-    if (now - lastDisplay >= 5) {  // 200Hz refresh rate
-        displayManager.process();
-        lastDisplay = now;
-    }
-
-    // System health check less frequently
+    // Only handle system checks here, LVGL updates are handled by dedicated task
     if (now - lastCheck >= 5000) {
         lastCheck = now;
         performSystemHealthCheck();
     }
-
-    // Allow other tasks to run
-    delay(1);
+    
+    delay(1);  // Yield to other tasks
 }
 
 /**
@@ -99,7 +91,6 @@ void initializeComponents() {
         Serial.println("Display initialization failed!");
     } else {
         Serial.println("Display initialized successfully");
-        display.testDisplay();
     }
 
     // Initialize network and sensor components

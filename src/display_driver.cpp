@@ -49,7 +49,7 @@ bool ILI9341Driver::begin() {
         return false;
     }
 
-    tft->begin();
+    tft->begin(80000000); // Set SPI clock to 80MHz for faster updates
     
     // Configure display orientation
     tft->setRotation(1);  // Landscape mode

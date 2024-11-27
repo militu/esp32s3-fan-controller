@@ -199,7 +199,7 @@ void DisplayUI::updateTemperatureDisplay(float temp) {
     lv_anim_set_var(&arcAnim, arc);
     lv_anim_set_exec_cb(&arcAnim, arcAnimCallback);
     lv_anim_set_values(&arcAnim, currentArcValue, targetValue);
-    lv_anim_set_time(&arcAnim, 500);  // 500ms duration
+    lv_anim_set_time(&arcAnim, 750);  // Increase duration to 750ms
     lv_anim_set_path_cb(&arcAnim, lv_anim_path_ease_out);
     lv_anim_start(&arcAnim);
     
