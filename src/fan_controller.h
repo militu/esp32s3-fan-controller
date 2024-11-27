@@ -119,6 +119,7 @@ private:
     static constexpr BaseType_t TASK_CORE = 1;
     static constexpr uint32_t MUTEX_TIMEOUT_MS = 1000;
     static constexpr uint8_t STALL_RETRY_COUNT = 3;
+    static constexpr uint32_t EVENT_CHECK_INTERVAL = 1000;  // Check events every second
 
     // Core components
     TaskManager& taskManager;

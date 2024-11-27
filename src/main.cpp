@@ -5,6 +5,7 @@
  * and MQTT communication for an environmental control application.
  */
 
+
 #include <Arduino.h>
 #include "task_manager.h"
 #include "wifi_manager.h"
@@ -15,6 +16,8 @@
 #include "display_manager.h"
 #include "display_driver.h"
 #include "display_config.h"
+
+#define DEBUG_LOG(msg, ...) if (DEBUG_MAIN) { Serial.printf(msg "\n", ##__VA_ARGS__); }
 
 // System component instances
 TaskManager taskManager;
@@ -30,7 +33,7 @@ MqttManager mqttManager(taskManager, tempSensor, fanController);
     ILI9341Driver display(ILI9341_CS_PIN, ILI9341_DC_PIN);
 #endif
 
-DisplayManager displayManager(tempSensor, fanController, wifiManager, mqttManager);
+DisplayManager displayManager(taskManager, tempSensor, fanController, wifiManager, mqttManager);
 
 // Function declarations
 void initializeComponents();
@@ -56,17 +59,15 @@ void setup() {
  */
 void loop() {
     static uint32_t lastCheck = 0;
+    uint32_t now = millis();
 
-    // Update display
-    displayManager.process();
-
-    // Perform system health check every 5 seconds
-    if (millis() - lastCheck >= 5000) {
-        lastCheck = millis();
+    // Only handle system checks here, LVGL updates are handled by dedicated task
+    if (now - lastCheck >= 5000) {
+        lastCheck = now;
         performSystemHealthCheck();
     }
     
-    delay(100);
+    delay(1);  // Yield to other tasks
 }
 
 /**
@@ -79,10 +80,10 @@ void initializeComponents() {
     // Initialize task manager
     err = taskManager.begin();
     if (err != ESP_OK) {
-        Serial.printf("Task manager initialization failed! Error: %d\n", err);
+        DEBUG_LOG("Task manager initialization failed! Error: %d\n", err);
         while (1) { delay(1000); }  // Critical failure - halt system
     }
-    Serial.println("TaskManager initialized successfully");
+    DEBUG_LOG("TaskManager initialized successfully");
     
     // Register component relationships
     tempSensor.registerFanController(&fanController);
@@ -90,31 +91,30 @@ void initializeComponents() {
 
     // Initialize display
     if (!displayManager.begin(&display)) {
-        Serial.println("Display initialization failed!");
+        DEBUG_LOG("Display initialization failed!");
     } else {
-        Serial.println("Display initialized successfully");
-        display.testDisplay();
+        DEBUG_LOG("Display initialized successfully");
     }
 
     // Initialize network and sensor components
     err = wifiManager.begin();
     if (err != ESP_OK) {
-        Serial.printf("WiFi manager initialization failed! Error: %d\n", err);
+        DEBUG_LOG("WiFi manager initialization failed! Error: %d\n", err);
     }
 
     err = tempSensor.begin();
     if (err != ESP_OK) {
-        Serial.printf("Temperature sensor initialization failed! Error: %d\n", err);
+        DEBUG_LOG("Temperature sensor initialization failed! Error: %d\n", err);
     }
 
     err = fanController.begin();
     if (err != ESP_OK) {
-        Serial.printf("Fan controller initialization failed! Error: %d\n", err);
+        DEBUG_LOG("Fan controller initialization failed! Error: %d\n", err);
     }
 
     err = mqttManager.begin();
     if (err != ESP_OK) {
-        Serial.printf("MQTT manager initialization failed! Error: %d\n", err);
+        DEBUG_LOG("MQTT manager initialization failed! Error: %d\n", err);
     }
 }
 
@@ -123,11 +123,11 @@ void initializeComponents() {
  * Monitors and reports status of all system components
  */
 void performSystemHealthCheck() {
-    // Serial.println("\n=== System Status ===");
+    DEBUG_LOG("\n=== System Status ===");
     
     // Check task health
     bool healthy = taskManager.checkTaskHealth();
-    // Serial.printf("System health: %s\n", healthy ? "OK" : "FAIL");
+    DEBUG_LOG("System health: %s\n", healthy ? "OK" : "FAIL");
     if (!healthy) {
         taskManager.dumpTaskStatus();
     }
@@ -135,28 +135,28 @@ void performSystemHealthCheck() {
     mqttManager.debugMutexState();
 
     // Report WiFi status
-    // Serial.printf("WiFi Status: %s\n", wifiManager.getStatusString());
+    DEBUG_LOG("WiFi Status: %s\n", wifiManager.getStatusString());
     if (wifiManager.isConnected()) {
-        // Serial.printf("IP: %s\n", wifiManager.getIPAddress().toString().c_str());
-        // Serial.printf("Signal: %d dBm\n", wifiManager.getSignalStrength());
+        DEBUG_LOG("IP: %s\n", wifiManager.getIPAddress().toString().c_str());
+        DEBUG_LOG("Signal: %d dBm\n", wifiManager.getSignalStrength());
     }
 
     // Report temperature status
-    // Serial.printf("Temperature Status: %s\n", tempSensor.getStatusString());
+    DEBUG_LOG("Temperature Status: %s\n", tempSensor.getStatusString());
     if (tempSensor.isLastReadSuccess()) {
-        // Serial.printf("Current: %.1f°C, Smoothed: %.1f°C\n",
-                    // tempSensor.getCurrentTemp(),
-                    // tempSensor.getSmoothedTemp());
+        DEBUG_LOG("Current: %.1f°C, Smoothed: %.1f°C\n",
+                    tempSensor.getCurrentTemp(),
+                    tempSensor.getSmoothedTemp());
     }
 
     // Report fan status
-    Serial.printf("Fan Status: %s\n", fanController.getStatusString().c_str());
-    Serial.printf("PWM Duty: %d%% (Target: %d%%), RPM: %d\n",
+    DEBUG_LOG("Fan Status: %s\n", fanController.getStatusString().c_str());
+    DEBUG_LOG("PWM Duty: %d%% (Target: %d%%), RPM: %d\n",
                 fanController.getCurrentPWM(),
                 fanController.getTargetPWM(),
                 fanController.getMeasuredRPM());
 
-    Serial.println("===================\n");
+    DEBUG_LOG("===================\n");
 
-    Serial.printf("MQTT Status: %s\n", mqttManager.isConnected() ? "Connected" : "Disconnected");
+    DEBUG_LOG("MQTT Status: %s\n", mqttManager.isConnected() ? "Connected" : "Disconnected");
 }

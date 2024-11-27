@@ -97,6 +97,11 @@ private:
     lv_obj_t* nightLabel;        ///< Night mode status
 
     bool initialized;            ///< Tracks whether UI has been initialized
+
+    // animation
+    lv_anim_t arcAnim;
+    int currentArcValue;
+    static void arcAnimCallback(void* var, int32_t value);
 };
 
 #endif // DISPLAY_UI_H

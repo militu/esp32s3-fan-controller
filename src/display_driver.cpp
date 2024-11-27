@@ -1,3 +1,5 @@
+#define DEBUG_LOG(msg, ...) if (DEBUG_DISPLAY) { Serial.printf(msg "\n", ##__VA_ARGS__); }
+
 #include "display_driver.h"
 
 /*******************************************************************************
@@ -13,7 +15,6 @@ ILI9341Driver::ILI9341Driver(uint8_t cs, uint8_t dc)
     : csPin(cs)
     , dcPin(dc)
     , tft(nullptr) {
-    Serial.printf("ILI9341Driver constructor: CS=%d, DC=%d\n", cs, dc);
 }
 
 /**
@@ -21,46 +22,25 @@ ILI9341Driver::ILI9341Driver(uint8_t cs, uint8_t dc)
  * @return true if initialization successful, false otherwise
  */
 bool ILI9341Driver::begin() {
-    if (initialized) return true;
+    if (initialized) return false;
 
-    Serial.println("Initializing ILI9341 display...");
-
-    // Hardware reset sequence
-    if (ILI9341_RST_PIN >= 0) {
-        pinMode(ILI9341_RST_PIN, OUTPUT);
-        digitalWrite(ILI9341_RST_PIN, HIGH);
-        delay(50);
-        digitalWrite(ILI9341_RST_PIN, LOW);
-        delay(50);
-        digitalWrite(ILI9341_RST_PIN, HIGH);
-        delay(50);
-    }
-
-    // Initialize backlight
-    if (ILI9341_BL_PIN >= 0) {
-        pinMode(ILI9341_BL_PIN, OUTPUT);
-        digitalWrite(ILI9341_BL_PIN, HIGH);
-    }
-
-    // Initialize display driver
-    tft = new Adafruit_ILI9341(ILI9341_CS_PIN, ILI9341_DC_PIN);
-    if (!tft) {
-        Serial.println("Failed to allocate ILI9341 driver!");
-        return false;
-    }
-
-    tft->begin();
+    // Initialize hardware SPI with optimized settings
+    SPI.begin();
+    // Set to maximum reliable speed for ILI9341
+    SPI.setFrequency(40000000); // 40MHz
+    // Use the most efficient data transfer mode
+    SPI.setDataMode(SPI_MODE0);
+    // Set to maximum bits per transfer
+    SPI.setBitOrder(MSBFIRST);
     
-    // Configure display orientation
-    tft->setRotation(1);  // Landscape mode
+    // Create and initialize the display driver
+    tft = new Adafruit_ILI9341(csPin, dcPin, -1); // -1 for hardware SPI
+    if (!tft) return false;
     
-    // Initial display test pattern
-    tft->fillScreen(ILI9341_BLACK);
-    delay(100);
-    tft->fillRect(0, 0, 50, 50, ILI9341_RED);
-    tft->fillRect(60, 0, 50, 50, ILI9341_GREEN);
-    tft->fillRect(120, 0, 50, 50, ILI9341_BLUE);
-
+    // Initialize with optimized settings
+    tft->begin(40000000); // Match SPI frequency
+    tft->setRotation(1); // Set initial rotation
+    
     initialized = true;
     return true;
 }
@@ -70,7 +50,7 @@ bool ILI9341Driver::begin() {
  * @param brightness Brightness level (0-255)
  */
 void ILI9341Driver::setBrightness(uint8_t brightness) {
-    Serial.printf("setBrightness called with value: %d\n", brightness);
+    DEBUG_LOG("setBrightness called with value: %d\n", brightness);
 }
 
 /**
@@ -79,27 +59,26 @@ void ILI9341Driver::setBrightness(uint8_t brightness) {
  * @param pixels Pixel data buffer
  */
 void ILI9341Driver::flush(const lv_area_t* area, uint8_t* pixels) {
-    static uint32_t flushCount = 0;
-    if (!initialized || !tft) {
-        Serial.println("Flush called but display not initialized!");
-        return;
-    }
+    if (!initialized || !tft) return;
 
-    uint16_t width = (area->x2 - area->x1 + 1);
-    uint16_t height = (area->y2 - area->y1 + 1);
-
-    // Debug logging every 100 flushes
-    if (flushCount % 100 == 0) {
-        Serial.printf("Flush #%lu: x1=%d, y1=%d, x2=%d, y2=%d, width=%d, height=%d\n",
-                     flushCount, area->x1, area->y1, area->x2, area->y2, width, height);
-    }
-
+    uint32_t start = millis();
+    uint32_t size = (area->x2 - area->x1 + 1) * (area->y2 - area->y1 + 1);
+    
     tft->startWrite();
-    tft->setAddrWindow(area->x1, area->y1, width, height);
-    tft->writePixels((uint16_t*)pixels, width * height);
+    uint32_t afterStart = millis();
+    
+    tft->setAddrWindow(area->x1, area->y1, 
+                      area->x2 - area->x1 + 1, 
+                      area->y2 - area->y1 + 1);
+    uint32_t afterWindow = millis();
+    
+    tft->writePixels((uint16_t*)pixels, size);
+    uint32_t afterPixels = millis();
+    
     tft->endWrite();
-
-    flushCount++;
+    uint32_t end = millis();
+    
+    lv_disp_flush_ready((lv_disp_drv_t*)lv_disp_get_default());
 }
 
 /**

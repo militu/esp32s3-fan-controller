@@ -247,13 +247,32 @@ void TempSensor::updateSmoothing(float newTemp) {
 
 void TempSensor::tempTask(void* parameters) {
     TempSensor* temp = static_cast<TempSensor*>(parameters);
-    DEBUG_LOG("Temperature task started");
+    TickType_t lastConversionStart = 0;
+    bool conversionInProgress = false;
     
     while (true) {
-        // Update the task's last run time
         temp->taskManager.updateTaskRunTime("Temp");
+        uint32_t currentTime = millis();
         
-        temp->processReading();
-        vTaskDelay(pdMS_TO_TICKS(TEMP_READ_INTERVAL));
+        if (!conversionInProgress) {
+            // Start new conversion
+            if (temp->startConversion()) {
+                lastConversionStart = xTaskGetTickCount();
+                conversionInProgress = true;
+                vTaskDelay(pdMS_TO_TICKS(800)); // Slightly longer than conversion time
+                continue;
+            }
+        } else {
+            // Check if conversion is complete
+            if ((xTaskGetTickCount() - lastConversionStart) >= pdMS_TO_TICKS(750)) {
+                temp->processReading();
+                conversionInProgress = false;
+                // Wait remainder of the interval
+                vTaskDelay(pdMS_TO_TICKS(TEMP_READ_INTERVAL - 800));
+                continue;
+            }
+        }
+        
+        vTaskDelay(pdMS_TO_TICKS(100)); // Short delay if neither condition met
     }
 }

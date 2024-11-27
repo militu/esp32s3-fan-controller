@@ -21,12 +21,13 @@ enum class SystemState {
 #define STATUS_LED_PIN 33
 
 // Debug Configuration
-#define DEBUG_WIFI true
-#define DEBUG_TEMP true
-#define DEBUG_PWM  true
-#define DEBUG_MAIN true
-#define DEBUG_MQTT true
-#define DEBUG_DISPLAY true
+#define DEBUG_WIFI false
+#define DEBUG_TEMP false
+#define DEBUG_FAN  false
+#define DEBUG_MAIN false
+#define DEBUG_MQTT false
+#define DEBUG_DISPLAY false
+#define DEBUG_TM false
 
 /*******************************************************************************
  * WiFi Configuration
@@ -34,14 +35,15 @@ enum class SystemState {
 #define WIFI_SSID           "Wokwi-GUEST"
 #define WIFI_PASSWORD       ""
 #define WIFI_MAX_RETRIES    3
-#define WIFI_CHECK_INTERVAL 120000  // 2 minutes
-#define WIFI_RETRY_DELAY    5000    // 5 seconds
+#define WIFI_CHECK_INTERVAL 300000  // 5 minutes
+#define WIFI_RETRY_DELAY    10000    // 5 seconds
+#define WIFI_BACKOFF_FACTOR   2        // For exponential backoff
 
 /*******************************************************************************
  * Temperature Sensor Configuration
  ******************************************************************************/
 #define TEMP_SENSOR_PIN     14
-#define TEMP_READ_INTERVAL  1000         // 1 second
+#define TEMP_READ_INTERVAL  5000         // 1 second
 #define TEMP_MAX_RETRIES    3
 #define TEMP_SMOOTH_SAMPLES 5
 #define TEMP_DEFAULT_VALUE  25.0
@@ -71,10 +73,10 @@ enum class SystemState {
 
 // Control Parameters
 #define FAN_PULSES_PER_REV  2            // Pulses per revolution
-#define RPM_UPDATE_INTERVAL 1000          // Update RPM every second
+#define RPM_UPDATE_INTERVAL 3000          // Update RPM every second
 #define FAN_MIN_RUNTIME     10000         // Min runtime before speed change
 #define FAN_RAMP_STEP       5             // PWM change per step
-#define FAN_RAMP_INTERVAL   100           // Ms between PWM changes
+#define FAN_RAMP_INTERVAL   350           // Ms between PWM changes
 
 // Fan Status Codes
 #define FAN_STATUS_OK           0
@@ -105,11 +107,11 @@ enum class FanMode {
 #define MQTT_PORT              1883
 #define MQTT_CLIENT_ID         "esp32_fan_controller"
 #define MQTT_RECONNECT_DELAY   5000
-#define MQTT_UPDATE_INTERVAL   2000   // 2 seconds
+#define MQTT_UPDATE_INTERVAL   5000   // 5 seconds
 #define MQTT_MAX_RETRIES      3
 
 // Base Topic
-#define MQTT_BASE_TOPIC "fan_controller_base_topic"
+#define MQTT_BASE_TOPIC "fan_controller_amadeusmilitu_128932"
 
 // Status & Control Topics
 #define MQTT_FAN_STATE_TOPIC             MQTT_BASE_TOPIC "/status"

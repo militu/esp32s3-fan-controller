@@ -3,7 +3,7 @@
  * @brief Implementation of the FanController class for PWM-based fan control
  */
 
-#define DEBUG_LOG(msg, ...) if (DEBUG_PWM) { Serial.printf(msg "\n", ##__VA_ARGS__); }
+#define DEBUG_LOG(msg, ...) if (DEBUG_FAN) { Serial.printf(msg "\n", ##__VA_ARGS__); }
 
 #include "fan_controller.h"
 #include "temp_sensor.h"
@@ -193,12 +193,28 @@ void FanController::processUpdate() {
 
 void FanController::fanTask(void* parameters) {
     FanController* fan = static_cast<FanController*>(parameters);
+    TickType_t lastRPMUpdate = xTaskGetTickCount();
+    TickType_t lastEventCheck = xTaskGetTickCount();
     
     while (true) {
         fan->taskManager.updateTaskRunTime("Fan");
-        fan->processEvents();      // Process any pending events
-        fan->processUpdate();      // Existing update logic
-        vTaskDelay(pdMS_TO_TICKS(RPM_UPDATE_INTERVAL));
+        
+        TickType_t now = xTaskGetTickCount();
+        
+        // Check events more frequently than RPM
+        if ((now - lastEventCheck) >= pdMS_TO_TICKS(EVENT_CHECK_INTERVAL)) {
+            fan->processEvents();
+            lastEventCheck = now;
+        }
+        
+        // Update RPM less frequently
+        if ((now - lastRPMUpdate) >= pdMS_TO_TICKS(RPM_UPDATE_INTERVAL)) {
+            fan->processUpdate();
+            lastRPMUpdate = now;
+        }
+        
+        // Shorter delay to allow more responsive event handling
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
 
@@ -328,12 +344,18 @@ bool FanController::isNightTime() const {
     struct tm *timeinfo = localtime(&now);
     int currentHour = timeinfo->tm_hour;
     
+    bool isNight;
     if (config.nightStartHour < config.nightEndHour) {
-        return currentHour >= config.nightStartHour && currentHour < config.nightEndHour;
+        isNight = currentHour >= config.nightStartHour && currentHour < config.nightEndHour;
     } else {
         // Handles cases like 22:00 to 06:00
-        return currentHour >= config.nightStartHour || currentHour < config.nightEndHour;
+        isNight = currentHour >= config.nightStartHour || currentHour < config.nightEndHour;
     }
+    
+    DEBUG_LOG("Time check - Current hour: %d, Start: %d, End: %d, Is night: %d", 
+              currentHour, config.nightStartHour, config.nightEndHour, isNight);
+    
+    return isNight;
 }
 
 //-----------------------------------------------------------------------------

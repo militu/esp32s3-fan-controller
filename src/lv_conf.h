@@ -23,25 +23,26 @@
  *====================*/
 
 /*1: use custom malloc/free, 0: use the built-in `lv_mem_alloc()` and `lv_mem_free()`*/
-#define LV_MEM_CUSTOM 1
+#define LV_MEM_CUSTOM 0
 #if LV_MEM_CUSTOM == 0
-    #define LV_MEM_SIZE (32U * 1024U)
+    #define LV_MEM_SIZE (48U * 1024U)
 #else
     #define LV_MEM_CUSTOM_INCLUDE <stdlib.h>
     #define LV_MEM_CUSTOM_ALLOC   malloc
     #define LV_MEM_CUSTOM_FREE    free
     #define LV_MEM_CUSTOM_REALLOC realloc
 #endif
+#define LV_MEM_POOL_INCLUDE <esp_heap_caps.h>
 
 /*====================
    HAL SETTINGS
  *====================*/
 
 /*Default display refresh period. LVG will redraw changed areas with this period time*/
-#define LV_DISP_DEF_REFR_PERIOD 30      /*[ms]*/
+#define LV_DISP_DEF_REFR_PERIOD 10      /*[ms]*/
 
 /*Input device read period in milliseconds*/
-#define LV_INDEV_DEF_READ_PERIOD 30     /*[ms]*/
+#define LV_INDEV_DEF_READ_PERIOD 10     /*[ms]*/
 
 /*Use a custom tick source that tells the elapsed time in milliseconds.*/
 #define LV_TICK_CUSTOM 1
@@ -92,6 +93,17 @@
 #define LV_USE_LINE       1
 #define LV_USE_TABLE      1
 #define LV_USE_CHART      1
+
+/*==================
+ * ANIMATION
+ *================*/
+
+#define LV_USE_ANIMATION 1
+#define LV_USE_GPU_STM32_DMA2D 0  // Disable unused features
+#define LV_USE_GPU_NXP_PXP 0
+#define LV_USE_GPU_NXP_VG_LITE 0
+#define LV_USE_GPU_SDL 0
+#define LV_ARC_INTERPOLATION_STACK_SIZE 4  // Reduce from default
 
 #endif /*LV_CONF_H*/
 

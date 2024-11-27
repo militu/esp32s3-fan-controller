@@ -7,6 +7,7 @@
 // Arduino and LVGL core
 #include <Arduino.h>
 #include "lvgl.h"
+#include "config.h"
 
 // ESP32 LCD drivers
 #include <esp_lcd_types.h>
