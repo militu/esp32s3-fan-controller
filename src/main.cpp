@@ -25,6 +25,7 @@ WifiManager wifiManager(taskManager);
 TempSensor tempSensor(taskManager);
 FanController fanController(taskManager);
 MqttManager mqttManager(taskManager, tempSensor, fanController);
+NTPManager ntpManager(taskManager);
 
 // Display initialization based on board type
 #ifdef USE_LILYGO_S3
@@ -88,6 +89,7 @@ void initializeComponents() {
     // Register component relationships
     tempSensor.registerFanController(&fanController);
     fanController.registerTempSensor(&tempSensor);
+    fanController.registerNTPManager(&ntpManager);
 
     // Initialize display
     if (!displayManager.begin(&display)) {
@@ -116,6 +118,12 @@ void initializeComponents() {
     if (err != ESP_OK) {
         DEBUG_LOG("MQTT manager initialization failed! Error: %d\n", err);
     }
+
+    err = ntpManager.begin();
+    if (err != ESP_OK) {
+        DEBUG_LOG("NTP manager initialization failed! Error: %d\n", err);
+    }    
+
 }
 
 /**
@@ -151,12 +159,16 @@ void performSystemHealthCheck() {
 
     // Report fan status
     DEBUG_LOG("Fan Status: %s\n", fanController.getStatusString().c_str());
-    DEBUG_LOG("PWM Duty: %d%% (Target: %d%%), RPM: %d\n",
-                fanController.getCurrentPWM(),
-                fanController.getTargetPWM(),
+    DEBUG_LOG("Speed Duty: %d%% (Target: %d%%), RPM: %d\n",
+                fanController.getCurrentSpeed(),
+                fanController.getTargetSpeed(),
                 fanController.getMeasuredRPM());
 
     DEBUG_LOG("===================\n");
 
     DEBUG_LOG("MQTT Status: %s\n", mqttManager.isConnected() ? "Connected" : "Disconnected");
+
+    DEBUG_LOG("NTP Status: %s", ntpManager.isTimeSynchronized() ? 
+        ("Synchronized - " + ntpManager.getTimeString()).c_str() : 
+        "Not synchronized");
 }

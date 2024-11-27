@@ -101,8 +101,8 @@ void DisplayManager::processLVGL() {
             uint32_t start_update = millis();
             ui.update(
                 cmd.temperature,
-                cmd.currentPWM,
-                cmd.targetPWM,
+                cmd.currentSpeed,
+                cmd.targetSpeed,
                 cmd.controlMode,
                 cmd.wifiConnected,
                 cmd.mqttConnected,
@@ -138,8 +138,8 @@ void DisplayManager::updateDisplayValues() {
     // Create a command with current state
     UICommand cmd(
         tempSensor.getSmoothedTemp(),
-        fanController.getCurrentPWM(),
-        fanController.getTargetPWM(),
+        fanController.getCurrentSpeed(),
+        fanController.getTargetSpeed(),
         fanController.getControlMode(),
         wifiManager.isConnected(),
         mqttManager.isConnected(),

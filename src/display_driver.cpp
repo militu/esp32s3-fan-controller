@@ -161,7 +161,7 @@ bool LilygoS3Driver::begin() {
     initBus();
     initPanel();
 
-    // Configure backlight PWM
+    // Configure backlight
     ledcSetup(0, 10000, 8);
     ledcAttachPin(PIN_LCD_BL, 0);
     ledcWrite(0, 255);
