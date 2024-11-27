@@ -7,6 +7,14 @@
 #include "task_manager.h"
 #include "mutex_guard.h"
 
+// Forward declarations
+class TempSensor;
+
+static constexpr EventBits_t FAN_EVENT_TEMP_UPDATED = (1 << 0);
+static constexpr EventBits_t FAN_EVENT_NIGHT_MODE_CHANGED = (1 << 1);
+static constexpr EventBits_t FAN_EVENT_CONTROL_MODE_CHANGED = (1 << 2);
+
+
 /**
  * @brief Controls a PWM-driven fan with RPM monitoring and various operating modes
  * 
@@ -96,6 +104,14 @@ public:
         return map(pwm, minPWM, maxPWM, 0, 100);
     }
 
+    static constexpr EventBits_t TEMP_UPDATED = FAN_EVENT_TEMP_UPDATED;
+    static constexpr EventBits_t NIGHT_MODE_CHANGED = FAN_EVENT_NIGHT_MODE_CHANGED;
+    static constexpr EventBits_t CONTROL_MODE_CHANGED = FAN_EVENT_CONTROL_MODE_CHANGED;
+
+    void registerTempSensor(TempSensor* sensor);
+    EventGroupHandle_t getEventGroup() const { return events; }
+
+
 private:
     // Constants
     static constexpr uint32_t TASK_STACK_SIZE = 4096;
@@ -138,4 +154,10 @@ private:
     bool isNightTime() const;
     uint8_t percentToRawPWM(int percent) const;
     int rawPWMToPercent(uint8_t raw) const;
+
+    EventGroupHandle_t events;
+    TempSensor* tempSensor;
+    void processEvents();  // New method to handle events
+    void setTemperatureInternal(float temperature);
+
 };

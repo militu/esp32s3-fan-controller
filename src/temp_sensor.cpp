@@ -6,6 +6,7 @@
 #define DEBUG_LOG(msg, ...) if (DEBUG_TEMP) { Serial.printf(msg "\n", ##__VA_ARGS__); }
 
 #include "temp_sensor.h"
+#include "fan_controller.h"
 
 //------------------------------------------------------------------------------
 // Constructor & Destructor
@@ -13,6 +14,7 @@
 
 TempSensor::TempSensor(TaskManager& tm)
     : taskManager(tm)
+    , fanController(nullptr)
     , oneWire(TEMP_SENSOR_PIN)
     , sensors(&oneWire)
     , mutex(xSemaphoreCreateMutex())
@@ -84,6 +86,13 @@ esp_err_t TempSensor::begin() {
     return ESP_OK;
 }
 
+void TempSensor::registerFanController(FanController* controller) {
+    MutexGuard guard(mutex);
+    if (guard.isLocked()) {
+        fanController = controller;
+    }
+}
+
 //------------------------------------------------------------------------------
 // Temperature Reading and Processing
 //------------------------------------------------------------------------------
@@ -98,6 +107,7 @@ void TempSensor::processReading() {
         MutexGuard guard(mutex);
         if (!guard.isLocked()) return;
         
+        DEBUG_LOG("Starting new temperature conversion");  // Add this
         sensors.requestTemperatures();
         conversionRequested = true;
         conversionRequestTime = millis();
@@ -113,25 +123,36 @@ void TempSensor::processReading() {
     if (!guard.isLocked()) return;
 
     float tempC = sensors.getTempCByIndex(0);
+    DEBUG_LOG("Raw temperature reading: %.2f°C", tempC);  // Add this
+    
+    bool tempChanged = false;
     
     // Validate temperature reading
     if (tempC != DEVICE_DISCONNECTED_C && tempC != 85.0 && tempC > -55.0 && tempC < 125.0) {
         lastReadSuccess = true;
         consecutiveFailures = 0;
+        tempChanged = (abs(tempC - currentTemp) > 0.1);
         currentTemp = tempC;
-        updateSmoothing(tempC);
-        DEBUG_LOG("Temperature: %.2f°C (Smoothed: %.2f°C)\n", currentTemp, smoothedTemp);
+        updateSmoothing(tempC);  // Always update smoothing
     } else {
         consecutiveFailures++;
         lastReadSuccess = false;
         if (consecutiveFailures >= TEMP_MAX_RETRIES) {
             currentTemp = TEMP_DEFAULT_VALUE;
         }
-        DEBUG_LOG("Temperature read failed (%d consecutive failures)\n", consecutiveFailures);
     }
 
     lastReadTime = currentTime;
     conversionRequested = false;
+
+    // Always notify of temperature update if successful, not just on changes
+    if (lastReadSuccess && fanController) {
+        EventGroupHandle_t events = fanController->getEventGroup();
+        if (events) {
+            DEBUG_LOG("Notifying fan controller of temperature update");
+            xEventGroupSetBits(events, FanController::TEMP_UPDATED);
+        }
+    }
 }
 
 //------------------------------------------------------------------------------

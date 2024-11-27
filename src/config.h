@@ -21,11 +21,12 @@ enum class SystemState {
 #define STATUS_LED_PIN 33
 
 // Debug Configuration
-#define DEBUG_WIFI false
-#define DEBUG_TEMP false
+#define DEBUG_WIFI true
+#define DEBUG_TEMP true
 #define DEBUG_PWM  true
-#define DEBUG_MAIN false
-#define DEBUG_MQTT false
+#define DEBUG_MAIN true
+#define DEBUG_MQTT true
+#define DEBUG_DISPLAY true
 
 /*******************************************************************************
  * WiFi Configuration
@@ -33,7 +34,7 @@ enum class SystemState {
 #define WIFI_SSID           "Wokwi-GUEST"
 #define WIFI_PASSWORD       ""
 #define WIFI_MAX_RETRIES    3
-#define WIFI_CHECK_INTERVAL 600000  // 10 minutes
+#define WIFI_CHECK_INTERVAL 120000  // 2 minutes
 #define WIFI_RETRY_DELAY    5000    // 5 seconds
 
 /*******************************************************************************
@@ -71,7 +72,7 @@ enum class SystemState {
 // Control Parameters
 #define FAN_PULSES_PER_REV  2            // Pulses per revolution
 #define RPM_UPDATE_INTERVAL 1000          // Update RPM every second
-#define FAN_MIN_RUNTIME     20000         // Min runtime before speed change
+#define FAN_MIN_RUNTIME     10000         // Min runtime before speed change
 #define FAN_RAMP_STEP       5             // PWM change per step
 #define FAN_RAMP_INTERVAL   100           // Ms between PWM changes
 
@@ -100,11 +101,11 @@ enum class FanMode {
  * MQTT Configuration
  ******************************************************************************/
 // Connection Settings
-#define MQTT_SERVER            "test.mosquitto.org"
+#define MQTT_SERVER            "broker.hivemq.com"
 #define MQTT_PORT              1883
 #define MQTT_CLIENT_ID         "esp32_fan_controller"
 #define MQTT_RECONNECT_DELAY   5000
-#define MQTT_UPDATE_INTERVAL   1000
+#define MQTT_UPDATE_INTERVAL   2000   // 2 seconds
 #define MQTT_MAX_RETRIES      3
 
 // Base Topic

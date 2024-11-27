@@ -6,6 +6,7 @@
 #define DEBUG_LOG(msg, ...) if (DEBUG_PWM) { Serial.printf(msg "\n", ##__VA_ARGS__); }
 
 #include "fan_controller.h"
+#include "temp_sensor.h"
 
 // Static member initialization
 volatile uint32_t FanController::pulseCount = 0;
@@ -17,6 +18,8 @@ volatile uint32_t FanController::pulseCount = 0;
 FanController::FanController(TaskManager& tm)
     : taskManager(tm)
     , mutex(nullptr)
+    , events(nullptr)
+    , tempSensor(nullptr)
     , config{
         .minTemp = DEFAULT_MIN_TEMP,
         .maxTemp = DEFAULT_MAX_TEMP,
@@ -38,15 +41,16 @@ FanController::FanController(TaskManager& tm)
     , initialized(false) {
     
     mutex = xSemaphoreCreateMutex();
-    if (!mutex) {
-        DEBUG_LOG("FanController - Mutex creation failed!");
+    events = xEventGroupCreate();
+    
+    if (!mutex || !events) {
+        DEBUG_LOG("FanController - Resource creation failed!");
     }
 }
 
 FanController::~FanController() {
-    if (mutex) {
-        vSemaphoreDelete(mutex);
-    }
+    if (mutex) vSemaphoreDelete(mutex);
+    if (events) vEventGroupDelete(events);
 }
 
 //-----------------------------------------------------------------------------
@@ -54,7 +58,7 @@ FanController::~FanController() {
 //-----------------------------------------------------------------------------
 
 esp_err_t FanController::begin() {
-    if (!mutex) return ESP_ERR_NO_MEM;
+    if (!mutex || !events) return ESP_ERR_NO_MEM;
 
     MutexGuard guard(mutex);
     if (!guard.isLocked()) return ESP_ERR_TIMEOUT;
@@ -74,7 +78,20 @@ esp_err_t FanController::begin() {
     if (err != ESP_OK) return err;
 
     initialized = true;
+    
+    // Set initial event to trigger first temperature reading
+    if (events) {
+        xEventGroupSetBits(events, TEMP_UPDATED);
+    }
+    
     return ESP_OK;
+}
+
+void FanController::registerTempSensor(TempSensor* sensor) {
+    MutexGuard guard(mutex);
+    if (guard.isLocked()) {
+        tempSensor = sensor;
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -95,6 +112,37 @@ bool FanController::setupTachometer() {
 
 void IRAM_ATTR FanController::handleTachInterrupt() {
     pulseCount++;
+}
+
+//-----------------------------------------------------------------------------
+// Process Events
+//-----------------------------------------------------------------------------
+
+void FanController::processEvents() {
+    if (!initialized || !events || !tempSensor) return;
+
+    EventBits_t bits = xEventGroupWaitBits(
+        events,
+        TEMP_UPDATED | NIGHT_MODE_CHANGED | CONTROL_MODE_CHANGED,
+        pdTRUE,
+        pdFALSE,
+        0
+    );
+
+    if (bits == 0) return;
+
+    // Move mutex guard to cover both the event check and temperature setting
+    MutexGuard guard(mutex);
+    if (!guard.isLocked()) return;
+
+    DEBUG_LOG("Processing fan events: 0x%lx", (unsigned long)bits);
+
+    if (mode == Mode::AUTO && tempSensor->isLastReadSuccess()) {
+        float temp = tempSensor->getSmoothedTemp();
+        DEBUG_LOG("About to update temperature to %.2f°C", temp);
+        // Call internal version without mutex guard
+        setTemperatureInternal(temp);
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -137,9 +185,9 @@ void FanController::processUpdate() {
     }
 
     if (status == Status::OK && currentPWM != targetPWM) {
+        DEBUG_LOG("Updating currentPWM %d -> %d", currentPWM, targetPWM);
         currentPWM = targetPWM;
         ledcWrite(PWM_CHANNEL, currentPWM);
-        DEBUG_LOG("PWM updated to: %d", currentPWM);
     }
 }
 
@@ -148,7 +196,8 @@ void FanController::fanTask(void* parameters) {
     
     while (true) {
         fan->taskManager.updateTaskRunTime("Fan");
-        fan->processUpdate();
+        fan->processEvents();      // Process any pending events
+        fan->processUpdate();      // Existing update logic
         vTaskDelay(pdMS_TO_TICKS(RPM_UPDATE_INTERVAL));
     }
 }
@@ -190,8 +239,8 @@ bool FanController::setControlMode(Mode newMode) {
     if (newMode == Mode::ERROR) return false;
     
     mode = newMode;
-    if (mode == Mode::AUTO) {
-        targetPWM = config.minPWM;
+    if (events) {
+        xEventGroupSetBits(events, CONTROL_MODE_CHANGED);
     }
     return true;
 }
@@ -210,17 +259,34 @@ bool FanController::setPWMDutyCycle(int percentPWM) {
     return true;
 }
 
+void FanController::setTemperatureInternal(float temperature) {
+    uint8_t rawPWM = calculatePWMForTemperature(temperature);
+    DEBUG_LOG("Temperature %.2f -> rawPWM %d", temperature, rawPWM);
+    
+    if (nightModeEnabled) {
+        uint8_t beforeNight = rawPWM;
+        applyNightMode(rawPWM);
+        DEBUG_LOG("Night mode adjusted PWM %d -> %d", beforeNight, rawPWM);
+    }
+    
+    DEBUG_LOG("Setting targetPWM to %d", rawPWM);
+    targetPWM = rawPWM;
+}
+
+// Modify existing public method to use internal version
 bool FanController::setTemperature(float temperature) {
-    if (!initialized || mode != Mode::AUTO) return false;
+    if (!initialized || mode != Mode::AUTO) {
+        DEBUG_LOG("setTemperature rejected - initialized: %d, mode: %d", initialized, (int)mode);
+        return false;
+    }
 
     MutexGuard guard(mutex);
-    if (!guard.isLocked()) return false;
-
-    uint8_t rawPWM = calculatePWMForTemperature(temperature);
-    if (nightModeEnabled) {
-        applyNightMode(rawPWM);
+    if (!guard.isLocked()) {
+        DEBUG_LOG("setTemperature failed to acquire mutex");
+        return false;
     }
-    targetPWM = rawPWM;
+
+    setTemperatureInternal(temperature);
     return true;
 }
 
@@ -234,6 +300,9 @@ bool FanController::setNightMode(bool enabled) {
 
     DEBUG_LOG("Night mode %s", enabled ? "enabled" : "disabled");
     nightModeEnabled = enabled;
+    if (events) {
+        xEventGroupSetBits(events, NIGHT_MODE_CHANGED);
+    }
     return true;
 }
 
