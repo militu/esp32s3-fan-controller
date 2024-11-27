@@ -21,11 +21,11 @@ enum class SystemState {
 #define STATUS_LED_PIN 33
 
 // Debug Configuration
-#define DEBUG_WIFI true
-#define DEBUG_TEMP true
-#define DEBUG_PWM  true
-#define DEBUG_MAIN true
-#define DEBUG_MQTT true
+#define DEBUG_WIFI false
+#define DEBUG_TEMP false
+#define DEBUG_PWM  false
+#define DEBUG_MAIN false
+#define DEBUG_MQTT false
 #define DEBUG_DISPLAY true
 
 /*******************************************************************************

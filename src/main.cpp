@@ -77,10 +77,10 @@ void initializeComponents() {
     // Initialize task manager
     err = taskManager.begin();
     if (err != ESP_OK) {
-        Serial.printf("Task manager initialization failed! Error: %d\n", err);
+        // Serial.printf("Task manager initialization failed! Error: %d\n", err);
         while (1) { delay(1000); }  // Critical failure - halt system
     }
-    Serial.println("TaskManager initialized successfully");
+    // Serial.println("TaskManager initialized successfully");
     
     // Register component relationships
     tempSensor.registerFanController(&fanController);
@@ -88,30 +88,30 @@ void initializeComponents() {
 
     // Initialize display
     if (!displayManager.begin(&display)) {
-        Serial.println("Display initialization failed!");
+        // Serial.println("Display initialization failed!");
     } else {
-        Serial.println("Display initialized successfully");
+        // Serial.println("Display initialized successfully");
     }
 
     // Initialize network and sensor components
     err = wifiManager.begin();
     if (err != ESP_OK) {
-        Serial.printf("WiFi manager initialization failed! Error: %d\n", err);
+        // Serial.printf("WiFi manager initialization failed! Error: %d\n", err);
     }
 
     err = tempSensor.begin();
     if (err != ESP_OK) {
-        Serial.printf("Temperature sensor initialization failed! Error: %d\n", err);
+        // Serial.printf("Temperature sensor initialization failed! Error: %d\n", err);
     }
 
     err = fanController.begin();
     if (err != ESP_OK) {
-        Serial.printf("Fan controller initialization failed! Error: %d\n", err);
+        // Serial.printf("Fan controller initialization failed! Error: %d\n", err);
     }
 
     err = mqttManager.begin();
     if (err != ESP_OK) {
-        Serial.printf("MQTT manager initialization failed! Error: %d\n", err);
+        // Serial.printf("MQTT manager initialization failed! Error: %d\n", err);
     }
 }
 
@@ -147,13 +147,13 @@ void performSystemHealthCheck() {
     }
 
     // Report fan status
-    Serial.printf("Fan Status: %s\n", fanController.getStatusString().c_str());
-    Serial.printf("PWM Duty: %d%% (Target: %d%%), RPM: %d\n",
-                fanController.getCurrentPWM(),
-                fanController.getTargetPWM(),
-                fanController.getMeasuredRPM());
+    // Serial.printf("Fan Status: %s\n", fanController.getStatusString().c_str());
+    // Serial.printf("PWM Duty: %d%% (Target: %d%%), RPM: %d\n",
+    //             fanController.getCurrentPWM(),
+    //             fanController.getTargetPWM(),
+    //             fanController.getMeasuredRPM());
 
-    Serial.println("===================\n");
+    // Serial.println("===================\n");
 
-    Serial.printf("MQTT Status: %s\n", mqttManager.isConnected() ? "Connected" : "Disconnected");
+    // Serial.printf("MQTT Status: %s\n", mqttManager.isConnected() ? "Connected" : "Disconnected");
 }

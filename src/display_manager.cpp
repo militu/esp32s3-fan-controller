@@ -1,3 +1,5 @@
+#define DEBUG_LOG(msg, ...) if (DEBUG_DISPLAY) { Serial.printf(msg "\n", ##__VA_ARGS__); }
+
 #include "display_manager.h"
 
 /*******************************************************************************
@@ -31,7 +33,7 @@ bool DisplayManager::begin(DisplayDriver* displayDriver) {
 
     lv_init();
 
-    static uint32_t buf_size = driver->width() * 40;
+    static uint32_t buf_size = driver->width() * 10;
     static lv_disp_draw_buf_t draw_buf;
     static lv_color_t *buf1 = (lv_color_t *)heap_caps_malloc(
         buf_size * sizeof(lv_color_t), MALLOC_CAP_DMA);
@@ -80,11 +82,23 @@ void DisplayManager::lvglTask(void* parameters) {
 void DisplayManager::processLVGL() {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     UICommand cmd;
+    static uint32_t last_lvgl_time = 0;
+    static uint32_t frame_count = 0;
     
     while (true) {
-        // Process any pending UI commands
+        uint32_t current_time = millis();
+        uint32_t lvgl_interval = current_time - last_lvgl_time;
+        
+        // Log only every 100 frames to reduce overhead
+        if (frame_count % 100 == 0) {
+            DEBUG_LOG("Display: Frame %lu - Interval: %lu ms\n", frame_count, lvgl_interval);
+        }
+        last_lvgl_time = current_time;
+        frame_count++;
+
+        // Process any pending UI commands silently
         while (xQueueReceive(uiCommandQueue, &cmd, 0) == pdTRUE) {
-            // Update UI with the latest command
+            uint32_t start_update = millis();
             ui.update(
                 cmd.temperature,
                 cmd.currentPWM,
@@ -96,8 +110,15 @@ void DisplayManager::processLVGL() {
             );
         }
 
-        // Handle LVGL timers and animations
+        // Time the LVGL handler specifically
+        uint32_t start_lvgl = millis();
         lv_timer_handler();
+        uint32_t lvgl_time = millis() - start_lvgl;
+        
+        // Log only significant delays
+        if (lvgl_time > 50) {  // Adjusted threshold to catch major delays
+            DEBUG_LOG("Display: Long frame - LVGL took %lu ms\n", lvgl_time);
+        }
         
         static uint32_t last_update = 0;
         uint32_t now = millis();
@@ -109,9 +130,7 @@ void DisplayManager::processLVGL() {
         
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(2));
     }
-}
-
-void DisplayManager::updateDisplayValues() {
+}void DisplayManager::updateDisplayValues() {
     if (!initialized) return;
 
     // Create a command with current state
