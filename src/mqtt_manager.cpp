@@ -469,12 +469,12 @@ void MqttManager::handleModeMessage(const JsonDocument& doc) {
         bool modeResult = fanController.setControlMode(FanController::Mode::MANUAL);
         DEBUG_LOG("Set manual mode result: %s", modeResult ? "success" : "failed");
         
-        // Set PWM if provided
-        if (modeResult && doc["pwm"].is<int>()) {
-            int pwm = doc["pwm"];
-            DEBUG_LOG("Setting manual PWM to: %d", pwm);
-            bool pwmResult = fanController.setPWMDutyCycle(pwm);
-            DEBUG_LOG("Set PWM result: %s", pwmResult ? "success" : "failed");
+        // Set speed if provided
+        if (modeResult && doc["speed"].is<int>()) {
+            int speed = doc["speed"];
+            DEBUG_LOG("Setting manual speed to: %d", speed);
+            bool speedResult = fanController.setSpeedDutyCycle(speed);
+            DEBUG_LOG("Set speed result: %s", speedResult ? "success" : "failed");
         }
     }
 }
@@ -485,7 +485,7 @@ void MqttManager::handleNightSettingsMessage(const JsonDocument& doc) {
     // Validate required fields
     if (!doc["start_hour"].is<int>() || 
         !doc["end_hour"].is<int>() || 
-        !doc["max_pwm"].is<int>()) {
+        !doc["max_speed"].is<int>()) {
         DEBUG_LOG("Night settings message missing or invalid required fields");
         return;
     }
@@ -493,25 +493,20 @@ void MqttManager::handleNightSettingsMessage(const JsonDocument& doc) {
     // Get and validate values
     int startHour = doc["start_hour"];
     int endHour = doc["end_hour"];
-    int maxPWM = doc["max_pwm"];
+    int maxPercent = doc["max_speed"];
 
     if (startHour < 0 || startHour > 23 || 
         endHour < 0 || endHour > 23 || 
-        maxPWM < 0 || maxPWM > 100) {
+        maxPercent < 0 || maxPercent > 100) {
         DEBUG_LOG("Night settings values out of range");
         return;
     }
 
-    // Convert PWM percentage to raw value
-    uint8_t rawMaxPWM = FanController::convertPercentToPWM(
-        maxPWM, 
-        fanController.getConfig().minPWM, 
-        fanController.getConfig().maxPWM
-    );
-
-    // Update settings
-    bool result = fanController.setNightSettings(startHour, endHour, rawMaxPWM);
-    DEBUG_LOG("Night settings update result: %s", result ? "success" : "failed");
+    // Use the percentage directly with the updated FanController method
+    bool result = fanController.setNightSettings(startHour, endHour, maxPercent);
+    
+    DEBUG_LOG("Night settings update - Start: %d, End: %d, MaxSpeed: %d%% (Result: %s)", 
+              startHour, endHour, maxPercent, result ? "success" : "failed");
 }
 
 // =============================================================================
@@ -529,19 +524,16 @@ void MqttManager::publishStatus() {
     
     // Populate status document
     doc["status"] = fanController.getStatus() == FanController::Status::OK ? "ok" : "error";
-    doc["fan_pwm"] = fanController.getCurrentPWM();
-    doc["target_pwm"] = fanController.getTargetPWM();
+    doc["fan_speed"] = fanController.getCurrentSpeed();
+    doc["target_speed"] = fanController.getTargetSpeed();
     doc["rpm"] = fanController.getMeasuredRPM();
     doc["mode"] = fanController.getControlMode() == FanController::Mode::AUTO ? "auto" : "manual";
     doc["temp"] = tempSensor.getSmoothedTemp();
     doc["night_mode"] = fanController.isNightModeActive();
     doc["night_start"] = fanController.getNightStartHour();
     doc["night_end"] = fanController.getNightEndHour();
-    doc["night_max_pwm"] = FanController::convertPWMToPercent(
-        fanController.getNightMaxPWM(),
-        fanController.getConfig().minPWM,
-        fanController.getConfig().maxPWM
-    );
+    doc["night_max_speed"] = fanController.getNightMaxSpeed();
+
 
     // Serialize and publish
     char buffer[512];

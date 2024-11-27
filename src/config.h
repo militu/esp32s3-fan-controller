@@ -21,14 +21,14 @@ enum class SystemState {
 #define STATUS_LED_PIN 33
 
 // Debug Configuration
-#define DEBUG_WIFI false
-#define DEBUG_TEMP false
+#define DEBUG_WIFI true
+#define DEBUG_TEMP true
 #define DEBUG_FAN  true
-#define DEBUG_MAIN false
-#define DEBUG_MQTT false
-#define DEBUG_DISPLAY false
-#define DEBUG_TM false
-#define DEBUG_NTP false
+#define DEBUG_MAIN true
+#define DEBUG_MQTT true
+#define DEBUG_DISPLAY true
+#define DEBUG_TM true
+#define DEBUG_NTP true
 
 /*******************************************************************************
  * WiFi Configuration
@@ -46,7 +46,7 @@ enum class SystemState {
 #define TEMP_SENSOR_PIN     14
 #define TEMP_READ_INTERVAL  5000         // 1 second
 #define TEMP_MAX_RETRIES    3
-#define TEMP_SMOOTH_SAMPLES 5
+#define TEMP_SMOOTH_SAMPLES 1
 #define TEMP_DEFAULT_VALUE  25.0
 #define TEMP_READ_TIMEOUT   1000         // 1 second
 
@@ -66,9 +66,11 @@ enum class SystemState {
 #define PWM_CHANNEL         0
 
 // Speed Limits
-#define FAN_MIN_PWM         26           // ~10% PWM
-#define FAN_MAX_PWM         255          // 100% PWM
-#define FAN_DEFAULT_PWM     77           // 30% PWM default
+#define FAN_MIN_SPEED         10           // ~10% PWM
+#define FAN_MAX_SPEED         100          // 100% PWM
+#define FAN_MIN_PWM         26           // ~10% PWM - used for conversion
+#define FAN_MAX_PWM         255          // 100% PWM - used for conversion
+
 #define RPM_MINIMUM         300          // Minimum expected RPM
 #define RPM_MAXIMUM         3300         // Maximum expected RPM
 
@@ -98,7 +100,7 @@ enum class FanMode {
  ******************************************************************************/
 #define NIGHT_MODE_START    22            // 24-hour format
 #define NIGHT_MODE_END      7
-#define NIGHT_MODE_MAX_PWM  102          // 40% maximum speed at night
+#define NIGHT_MODE_MAX_SPEED  40          // 40% maximum speed at night
 
 /*******************************************************************************
  * MQTT Configuration
@@ -112,7 +114,7 @@ enum class FanMode {
 #define MQTT_MAX_RETRIES      3
 
 // Base Topic
-#define MQTT_BASE_TOPIC "fan_controller_amadeusmilitu_128932"
+#define MQTT_BASE_TOPIC "fan_controller_esp_32"
 
 // Status & Control Topics
 #define MQTT_FAN_STATE_TOPIC             MQTT_BASE_TOPIC "/status"

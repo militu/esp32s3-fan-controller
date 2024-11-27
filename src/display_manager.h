@@ -61,8 +61,8 @@ private:
         
         CommandType type;
         float temperature;
-        uint8_t currentPWM;
-        uint8_t targetPWM;
+        uint8_t currentSpeed;
+        uint8_t targetSpeed;
         FanController::Mode controlMode;
         bool wifiConnected;
         bool mqttConnected;
@@ -76,8 +76,8 @@ private:
                  bool mqtt, bool night)
             : type(CommandType::UPDATE_DISPLAY)
             , temperature(temp)
-            , currentPWM(current)
-            , targetPWM(target)
+            , currentSpeed(current)
+            , targetSpeed(target)
             , controlMode(mode)
             , wifiConnected(wifi)
             , mqttConnected(mqtt)

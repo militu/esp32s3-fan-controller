@@ -89,6 +89,7 @@ void initializeComponents() {
     // Register component relationships
     tempSensor.registerFanController(&fanController);
     fanController.registerTempSensor(&tempSensor);
+    fanController.registerNTPManager(&ntpManager);
 
     // Initialize display
     if (!displayManager.begin(&display)) {
@@ -122,8 +123,6 @@ void initializeComponents() {
     if (err != ESP_OK) {
         DEBUG_LOG("NTP manager initialization failed! Error: %d\n", err);
     }    
-
-    fanController.registerNTPManager(&ntpManager);
 
 }
 
@@ -160,9 +159,9 @@ void performSystemHealthCheck() {
 
     // Report fan status
     DEBUG_LOG("Fan Status: %s\n", fanController.getStatusString().c_str());
-    DEBUG_LOG("PWM Duty: %d%% (Target: %d%%), RPM: %d\n",
-                fanController.getCurrentPWM(),
-                fanController.getTargetPWM(),
+    DEBUG_LOG("Speed Duty: %d%% (Target: %d%%), RPM: %d\n",
+                fanController.getCurrentSpeed(),
+                fanController.getTargetSpeed(),
                 fanController.getMeasuredRPM());
 
     DEBUG_LOG("===================\n");
