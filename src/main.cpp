@@ -56,7 +56,6 @@ void setup() {
  */
 void loop() {
     static uint32_t lastCheck = 0;
-    static bool lastNightModeState = fanController.isNightModeActive();
 
     // Update display
     displayManager.process();
@@ -65,22 +64,6 @@ void loop() {
     if (millis() - lastCheck >= 5000) {
         lastCheck = millis();
         performSystemHealthCheck();
-
-        // Update fan control based on temperature if in auto mode
-        if (fanController.getControlMode() == FanController::Mode::AUTO) {
-            if (tempSensor.isLastReadSuccess()) {
-                fanController.setTemperature(tempSensor.getSmoothedTemp());
-            }
-        }
-
-        // Handle night mode state changes
-        bool currentNightModeState = fanController.isNightModeActive();
-        if (currentNightModeState != lastNightModeState) {
-            lastNightModeState = currentNightModeState;
-            if (fanController.getControlMode() == FanController::Mode::AUTO) {
-                fanController.setTemperature(tempSensor.getSmoothedTemp());
-            }
-        }
     }
     
     delay(100);
@@ -101,6 +84,10 @@ void initializeComponents() {
     }
     Serial.println("TaskManager initialized successfully");
     
+    // Register component relationships
+    tempSensor.registerFanController(&fanController);
+    fanController.registerTempSensor(&tempSensor);
+
     // Initialize display
     if (!displayManager.begin(&display)) {
         Serial.println("Display initialization failed!");
@@ -136,11 +123,11 @@ void initializeComponents() {
  * Monitors and reports status of all system components
  */
 void performSystemHealthCheck() {
-    Serial.println("\n=== System Status ===");
+    // Serial.println("\n=== System Status ===");
     
     // Check task health
     bool healthy = taskManager.checkTaskHealth();
-    Serial.printf("System health: %s\n", healthy ? "OK" : "FAIL");
+    // Serial.printf("System health: %s\n", healthy ? "OK" : "FAIL");
     if (!healthy) {
         taskManager.dumpTaskStatus();
     }
@@ -148,18 +135,18 @@ void performSystemHealthCheck() {
     mqttManager.debugMutexState();
 
     // Report WiFi status
-    Serial.printf("WiFi Status: %s\n", wifiManager.getStatusString());
+    // Serial.printf("WiFi Status: %s\n", wifiManager.getStatusString());
     if (wifiManager.isConnected()) {
-        Serial.printf("IP: %s\n", wifiManager.getIPAddress().toString().c_str());
-        Serial.printf("Signal: %d dBm\n", wifiManager.getSignalStrength());
+        // Serial.printf("IP: %s\n", wifiManager.getIPAddress().toString().c_str());
+        // Serial.printf("Signal: %d dBm\n", wifiManager.getSignalStrength());
     }
 
     // Report temperature status
-    Serial.printf("Temperature Status: %s\n", tempSensor.getStatusString());
+    // Serial.printf("Temperature Status: %s\n", tempSensor.getStatusString());
     if (tempSensor.isLastReadSuccess()) {
-        Serial.printf("Current: %.1f°C, Smoothed: %.1f°C\n",
-                    tempSensor.getCurrentTemp(),
-                    tempSensor.getSmoothedTemp());
+        // Serial.printf("Current: %.1f°C, Smoothed: %.1f°C\n",
+                    // tempSensor.getCurrentTemp(),
+                    // tempSensor.getSmoothedTemp());
     }
 
     // Report fan status

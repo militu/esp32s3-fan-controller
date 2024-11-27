@@ -21,6 +21,9 @@
 #include "task_manager.h"
 #include "mutex_guard.h"
 
+// Forward declarations
+class FanController;
+
 class TempSensor {
 public:
     /**
@@ -49,6 +52,7 @@ public:
     // Task handling methods
     static void tempTask(void* parameters);  ///< FreeRTOS task function
     void processReading();                   ///< Process a temperature reading
+    void registerFanController(FanController* controller);
 
 private:
     // Hardware and system components
@@ -56,6 +60,7 @@ private:
     OneWire oneWire;
     DallasTemperature sensors;
     SemaphoreHandle_t mutex;
+    FanController* fanController;
 
     // Temperature data
     float currentTemp;         ///< Current raw temperature reading
