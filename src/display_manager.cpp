@@ -22,6 +22,10 @@ DisplayManager::DisplayManager(TaskManager& tm, TempSensor& ts, FanController& f
 bool DisplayManager::begin(DisplayDriver* displayDriver) {
     if (initialized || !displayDriver) return false;
     
+    // Add this line early in the method
+    uiCommandQueue = xQueueCreate(QUEUE_SIZE, sizeof(UICommand));
+    if (!uiCommandQueue) return false;
+
     driver = displayDriver;
     if (!driver->begin()) return false;
 
@@ -75,8 +79,24 @@ void DisplayManager::lvglTask(void* parameters) {
 
 void DisplayManager::processLVGL() {
     TickType_t xLastWakeTime = xTaskGetTickCount();
+    UICommand cmd;
     
     while (true) {
+        // Process any pending UI commands
+        while (xQueueReceive(uiCommandQueue, &cmd, 0) == pdTRUE) {
+            // Update UI with the latest command
+            ui.update(
+                cmd.temperature,
+                cmd.currentPWM,
+                cmd.targetPWM,
+                cmd.controlMode,
+                cmd.wifiConnected,
+                cmd.mqttConnected,
+                cmd.nightMode
+            );
+        }
+
+        // Handle LVGL timers and animations
         lv_timer_handler();
         
         static uint32_t last_update = 0;
@@ -94,7 +114,8 @@ void DisplayManager::processLVGL() {
 void DisplayManager::updateDisplayValues() {
     if (!initialized) return;
 
-    ui.update(
+    // Create a command with current state
+    UICommand cmd(
         tempSensor.getSmoothedTemp(),
         fanController.getCurrentPWM(),
         fanController.getTargetPWM(),
@@ -103,6 +124,13 @@ void DisplayManager::updateDisplayValues() {
         mqttManager.isConnected(),
         fanController.isNightModeActive()
     );
+
+    // Send to queue, with a short timeout
+    // We use a timeout of 0 to prevent blocking if queue is full
+    if (xQueueSend(uiCommandQueue, &cmd, 0) != pdTRUE) {
+        // Optional: Add error handling if queue is full
+        // For now, we'll just skip this update
+    }
 }
 
 void DisplayManager::flush_cb(lv_disp_drv_t* disp_drv, const lv_area_t* area, lv_color_t* color_p) {
