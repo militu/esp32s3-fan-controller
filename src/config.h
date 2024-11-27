@@ -26,7 +26,8 @@ enum class SystemState {
 #define DEBUG_PWM  false
 #define DEBUG_MAIN false
 #define DEBUG_MQTT false
-#define DEBUG_DISPLAY true
+#define DEBUG_DISPLAY false
+#define DEBUG_TM false
 
 /*******************************************************************************
  * WiFi Configuration
@@ -110,7 +111,7 @@ enum class FanMode {
 #define MQTT_MAX_RETRIES      3
 
 // Base Topic
-#define MQTT_BASE_TOPIC "fan_controller_base_topic"
+#define MQTT_BASE_TOPIC "fan_controller_amadeusmilitu_128932"
 
 // Status & Control Topics
 #define MQTT_FAN_STATE_TOPIC             MQTT_BASE_TOPIC "/status"

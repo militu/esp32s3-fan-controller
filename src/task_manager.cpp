@@ -3,6 +3,8 @@
  * @brief Implementation of the TaskManager class for FreeRTOS task management
  */
 
+#define DEBUG_LOG(msg, ...) if (DEBUG_TM) { Serial.printf(msg "\n", ##__VA_ARGS__); }
+
 #include "task_manager.h"
 
 //------------------------------------------------------------------------------
@@ -224,31 +226,31 @@ void TaskManager::updateTaskHealth(size_t taskIndex) {
 
 void TaskManager::dumpTaskStatus() {
     if (!initialized || !mutex) {
-        Serial.println("Task Manager not initialized!");
+        DEBUG_LOG("Task Manager not initialized!");
         return;
     }
 
     if (xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE) {
-        Serial.println("Failed to take mutex in dumpTaskStatus!");
+        DEBUG_LOG("Failed to take mutex in dumpTaskStatus!");
         return;
     }
 
-    Serial.println("\n=== Task Status Dump ===");
+    DEBUG_LOG("\n=== Task Status Dump ===");
     
     for (size_t i = 0; i < MAX_TASKS; i++) {
         if (tasks[i].active && tasks[i].handle) {
-            Serial.printf("\nTask: %s\n", tasks[i].config.name);
-            Serial.printf("State: %d\n", eTaskGetState(tasks[i].handle));
-            Serial.printf("Priority: %d\n", tasks[i].config.priority);
-            Serial.printf("Stack High Water: %d\n", tasks[i].health.stackHighWaterMark);
-            Serial.printf("Last Run: %lu ms ago\n", millis() - tasks[i].health.lastRunTime);
-            Serial.printf("Missed Deadlines: %lu\n", tasks[i].health.missedDeadlines);
-            Serial.printf("Consecutive Failures: %lu\n", tasks[i].health.consecutiveFailures);
-            Serial.printf("Health: %s\n", tasks[i].health.healthy ? "HEALTHY" : "UNHEALTHY");
+            DEBUG_LOG("\nTask: %s\n", tasks[i].config.name);
+            DEBUG_LOG("State: %d\n", eTaskGetState(tasks[i].handle));
+            DEBUG_LOG("Priority: %d\n", tasks[i].config.priority);
+            DEBUG_LOG("Stack High Water: %d\n", tasks[i].health.stackHighWaterMark);
+            DEBUG_LOG("Last Run: %lu ms ago\n", millis() - tasks[i].health.lastRunTime);
+            DEBUG_LOG("Missed Deadlines: %lu\n", tasks[i].health.missedDeadlines);
+            DEBUG_LOG("Consecutive Failures: %lu\n", tasks[i].health.consecutiveFailures);
+            DEBUG_LOG("Health: %s\n", tasks[i].health.healthy ? "HEALTHY" : "UNHEALTHY");
         }
     }
     
-    Serial.println("\n=== End Task Status ===\n");
+    DEBUG_LOG("\n=== End Task Status ===\n");
     
     xSemaphoreGive(mutex);
 }

@@ -1,3 +1,5 @@
+#define DEBUG_LOG(msg, ...) if (DEBUG_DISPLAY) { Serial.printf(msg "\n", ##__VA_ARGS__); }
+
 #include "display_driver.h"
 
 /*******************************************************************************
@@ -48,7 +50,7 @@ bool ILI9341Driver::begin() {
  * @param brightness Brightness level (0-255)
  */
 void ILI9341Driver::setBrightness(uint8_t brightness) {
-    Serial.printf("setBrightness called with value: %d\n", brightness);
+    DEBUG_LOG("setBrightness called with value: %d\n", brightness);
 }
 
 /**

@@ -16,6 +16,7 @@
 #include "freertos/semphr.h"
 #include "freertos/event_groups.h"
 #include "esp_err.h"
+#include "config.h"
 
 class TaskManager {
 public:
