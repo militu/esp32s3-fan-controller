@@ -6,6 +6,7 @@
 #include "config.h"
 #include "task_manager.h"
 #include "mutex_guard.h"
+#include "ntp_manager.h"
 
 // Forward declarations
 class TempSensor;
@@ -111,6 +112,8 @@ public:
     void registerTempSensor(TempSensor* sensor);
     EventGroupHandle_t getEventGroup() const { return events; }
 
+    // NTP
+    void registerNTPManager(NTPManager* manager);
 
 private:
     // Constants
@@ -126,6 +129,7 @@ private:
     SemaphoreHandle_t mutex;
     volatile static uint32_t pulseCount;
     Config config;
+    NTPManager* ntpManager;
 
     // State variables
     Mode mode;
@@ -152,7 +156,7 @@ private:
     uint8_t calculatePWMForTemperature(float temp);
     bool isStalled() const;
     void applyNightMode(uint8_t& pwm) const;
-    bool isNightTime() const;
+    bool isNightTimeRTC() const;
     uint8_t percentToRawPWM(int percent) const;
     int rawPWMToPercent(uint8_t raw) const;
 
@@ -160,5 +164,8 @@ private:
     TempSensor* tempSensor;
     void processEvents();  // New method to handle events
     void setTemperatureInternal(float temperature);
+
+    // NTP
+    bool isNightTime() const;
 
 };

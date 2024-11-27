@@ -37,6 +37,7 @@ FanController::FanController(TaskManager& tm)
     , currentPWM(0)
     , measuredRPM(0)
     , stallCount(0)
+    , ntpManager(nullptr)
     , nightModeEnabled(false)
     , initialized(false) {
     
@@ -268,7 +269,7 @@ bool FanController::setPWMDutyCycle(int percentPWM) {
     if (!guard.isLocked()) return false;
 
     uint8_t rawPWM = percentToRawPWM(percentPWM);
-    if (nightModeEnabled) {
+    if (nightModeEnabled && isNightTime()) {  // Add isNightTime() check here
         applyNightMode(rawPWM);
     }
     targetPWM = rawPWM;
@@ -338,7 +339,38 @@ bool FanController::setNightSettings(uint8_t startHour, uint8_t endHour, uint8_t
     return true;
 }
 
+void FanController::registerNTPManager(NTPManager* manager) {
+    MutexGuard guard(mutex);
+    if (guard.isLocked()) {
+        ntpManager = manager;
+    }
+}
+
 bool FanController::isNightTime() const {
+    // First check if we have valid NTP time
+    if (ntpManager && ntpManager->isTimeSynchronized()) {
+        int currentHour = ntpManager->getCurrentHour();
+        if (currentHour < 0) {
+            // NTP error, fall back to RTC
+            return isNightTimeRTC();
+        }
+
+        if (config.nightStartHour < config.nightEndHour) {
+            // Simple case: night period doesn't cross midnight
+            return currentHour >= config.nightStartHour && 
+                    currentHour < config.nightEndHour;
+        } else {
+            // Complex case: night period crosses midnight
+            return currentHour >= config.nightStartHour || 
+                    currentHour < config.nightEndHour;
+        }
+    }
+    
+    // Fallback to RTC if NTP is not available
+    return isNightTimeRTC();
+}
+
+bool FanController::isNightTimeRTC() const {
     time_t now;
     time(&now);
     struct tm *timeinfo = localtime(&now);
