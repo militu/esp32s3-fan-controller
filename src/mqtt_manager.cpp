@@ -1,8 +1,23 @@
-// mqtt_manager.cpp
-#define DEBUG_LOG(msg, ...) if (DEBUG_MQTT) { Serial.printf(msg "\n", ##__VA_ARGS__); }
+// =============================================================================
+// MQTT Manager Implementation
+// Handles MQTT communication, message processing, and status updates for a fan 
+// control system with temperature monitoring
+// =============================================================================
 
+#define DEBUG_LOG(msg, ...) if (DEBUG_MQTT) { Serial.printf(msg "\n", ##__VA_ARGS__); }
 #include "mqtt_manager.h"
 
+// =============================================================================
+// Helper Functions
+// =============================================================================
+
+/**
+ * Tests TCP connection to MQTT broker
+ * @param host Broker IP address
+ * @param port Broker port
+ * @param timeout_ms Connection timeout in milliseconds
+ * @return true if connection successful
+ */
 bool testConnection(const IPAddress& host, uint16_t port, int timeout_ms = 5000) {
     DEBUG_LOG("Testing connection to %s:%d", host.toString().c_str(), port);
     
@@ -19,6 +34,10 @@ bool testConnection(const IPAddress& host, uint16_t port, int timeout_ms = 5000)
     client.stop();
     return connected;
 }
+
+// =============================================================================
+// Constructor & Initialization
+// =============================================================================
 
 MqttManager* MqttManager::instance = nullptr;
 
@@ -40,6 +59,7 @@ MqttManager::MqttManager(TaskManager& tm, TempSensor& ts, FanController& fc)
     
     instance = this;
     DEBUG_LOG("Creating MQTT Manager mutexes");
+    // Initialize synchronization primitives
     connectionMutex = xSemaphoreCreateMutex();
     messageMutex = xSemaphoreCreateMutex();
     stateMutex = xSemaphoreCreateMutex();
@@ -57,6 +77,10 @@ MqttManager::~MqttManager() {
     if (messageQueue) vQueueDelete(messageQueue);
 }
 
+// =============================================================================
+// Connection Management
+// =============================================================================
+
 esp_err_t MqttManager::begin() {
     DEBUG_LOG("MQTT Manager Starting...");
 
@@ -71,6 +95,7 @@ esp_err_t MqttManager::begin() {
         return ESP_ERR_TIMEOUT;
     }
 
+    // Configure MQTT client
     mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
     mqttClient.setCallback(messageCallback);
     mqttClient.setSocketTimeout(30);  // 30 seconds timeout
@@ -104,12 +129,13 @@ void MqttManager::connect() {
     }
     DEBUG_LOG("Connection mutex acquired successfully");
 
+    // Generate unique client ID
     String clientId = MQTT_CLIENT_ID;
     clientId += "_";
     clientId += String(random(0xffff), HEX);
     DEBUG_LOG("Created client ID: %s", clientId.c_str());
 
-    // Try to resolve broker
+    // Resolve broker address
     IPAddress broker;
     if (!WiFi.hostByName(MQTT_SERVER, broker)) {
         DEBUG_LOG("Failed to resolve MQTT broker address");
@@ -117,13 +143,14 @@ void MqttManager::connect() {
     }
     DEBUG_LOG("MQTT broker IP resolved to: %s", broker.toString().c_str());
 
-    // Test TCP connection first
+    // Test TCP connection
     if (!testConnection(broker, MQTT_PORT)) {
         DEBUG_LOG("Failed to establish TCP connection to broker");
         return;
     }
     DEBUG_LOG("TCP connection test successful");
 
+    // Attempt connection with retries
     int retries = 0;
     bool connected = false;
 
@@ -131,7 +158,6 @@ void MqttManager::connect() {
         DEBUG_LOG("Starting connection attempt %d/%d to %s", retries + 1, MQTT_MAX_RETRIES, broker.toString().c_str());
         
         unsigned long startTime = millis();
-        
         
         // Connect with will message
         connected = mqttClient.connect(clientId.c_str(), 
@@ -157,7 +183,6 @@ void MqttManager::connect() {
                 
                 // Send initial status after successful connection
                 publishStatus();
-                
                 break;
             } else {
                 DEBUG_LOG("Failed to subscribe to topics!");
@@ -183,22 +208,22 @@ void MqttManager::processUpdate() {
         return;
     }
 
-    // Handle client loop first
+    // Handle periodic client processing
     unsigned long now = millis();
     
     if (now - lastClientLoop >= CLIENT_LOOP_INTERVAL) { 
         lastClientLoop = now;
-        mqttClient.loop();  // Important: Handle MQTT client processing
+        mqttClient.loop();
     }
 
-    // Publish availability status periodically
+    // Publish availability status
     if (mqttClient.connected() && now - lastAvailabilityPublish >= AVAILABILITY_INTERVAL) {
         lastAvailabilityPublish = now;
         mqttClient.publish(MQTT_AVAILABILITY_TOPIC, "online", true);
         DEBUG_LOG("Published availability status");
     }
 
-    // Process any queued messages
+    // Process message queue
     processQueuedMessages();
 
     // Publish status periodically
@@ -207,6 +232,7 @@ void MqttManager::processUpdate() {
         publishStatus();
     }
 
+    // Handle reconnection if needed
     bool needsReconnect = false;
     {
         MutexGuard guard(connectionMutex);
@@ -227,49 +253,29 @@ void MqttManager::processUpdate() {
     }
 }
 
-void MqttManager::publishString(const char* topic, const String& value) {
-    MutexGuard guard(messageMutex);
-    if (!guard.isLocked()) {
-        DEBUG_LOG("Failed to acquire mutex for publishing");
-        return;
-    }
-
-    if (mqttClient.connected()) {
-        bool published = mqttClient.publish(topic, value.c_str());
-        DEBUG_LOG("Published to %s: %s (success: %d)", topic, value.c_str(), published);
-    } else {
-        DEBUG_LOG("Failed to publish - not connected");
+void MqttManager::mqttTask(void* parameters) {
+    MqttManager* mqtt = static_cast<MqttManager*>(parameters);
+    DEBUG_LOG("MQTT Task started");
+    
+    while (true) {
+        mqtt->taskManager.updateTaskRunTime("MQTT");
+        mqtt->processUpdate();
+        vTaskDelay(pdMS_TO_TICKS(50));  // Run every 50ms
     }
 }
 
-bool MqttManager::setupSubscriptions() {
-    MutexGuard guard(messageMutex);
-    if (!guard.isLocked()) {
-        DEBUG_LOG("Failed to acquire mutex for subscriptions");
-        return false;
-    }
+// =============================================================================
+// Message Queue Management
+// =============================================================================
 
-    bool success = true;
-    success &= mqttClient.subscribe(MQTT_FAN_COMMAND_TOPIC);
-    success &= mqttClient.subscribe(MQTT_FAN_PRESET_COMMAND_TOPIC);
-    success &= mqttClient.subscribe(MQTT_NIGHT_MODE_COMMAND_TOPIC);
-    success &= mqttClient.subscribe(MQTT_NIGHT_SETTINGS_COMMAND_TOPIC);
-    success &= mqttClient.subscribe(MQTT_RECOVERY_TOPIC);
+void MqttManager::processQueuedMessages() {
+    static uint32_t messageCount = 0;
+    MQTTMessage msg;
     
-    DEBUG_LOG("Subscriptions setup %s", success ? "successful" : "failed");
-    return success;
-}
-
-void MqttManager::messageCallback(char* topic, byte* payload, unsigned int length) {
-    if (!instance) {
-        DEBUG_LOG("No MQTT instance available for callback");
-        return;
-    }
-    
-    DEBUG_LOG("Message received - Topic: %s, Length: %u", topic, length);
-    
-    if (!instance->enqueueMessage(topic, payload, length)) {
-        DEBUG_LOG("Failed to enqueue MQTT message");
+    while (xQueueReceive(messageQueue, &msg, 0) == pdTRUE) {
+        messageCount++;
+        DEBUG_LOG("Processing message %lu from queue - Topic: %s", messageCount, msg.topic);
+        handleMessage(msg.topic, (byte*)msg.payload, msg.payloadLength);
     }
 }
 
@@ -279,6 +285,7 @@ bool MqttManager::enqueueMessage(const char* topic, const byte* payload, unsigne
         return false;
     }
 
+    // Prepare message for queue
     MQTTMessage msg;
     strncpy(msg.topic, topic, MAX_TOPIC_LENGTH - 1);
     msg.topic[MAX_TOPIC_LENGTH - 1] = '\0';
@@ -288,6 +295,7 @@ bool MqttManager::enqueueMessage(const char* topic, const byte* payload, unsigne
     msg.payload[copyLength] = '\0';
     msg.payloadLength = copyLength;
 
+    // Add to queue with timeout
     BaseType_t result = xQueueSend(messageQueue, &msg, pdMS_TO_TICKS(QUEUE_TIMEOUT_MS));
     DEBUG_LOG("Message enqueued: %s", result == pdTRUE ? "success" : "failed");
     return result == pdTRUE;
@@ -428,147 +436,35 @@ void MqttManager::debugMutexState() {
         DEBUG_LOG("Connection mutex is locked!");
     }
 }
-void MqttManager::handleMessage(const char* topic, const byte* payload, unsigned int length) {
-    if (!topic || !payload || length == 0 || length >= MAX_PAYLOAD_LENGTH) {
-        DEBUG_LOG("Invalid message parameters");
-        return;
-    }
 
-    char* payloadCopy = (char*)malloc(length + 1);
-    if (!payloadCopy) {
-        DEBUG_LOG("Failed to allocate memory for payload");
-        return;
-    }
-    
-    memcpy(payloadCopy, payload, length);
-    payloadCopy[length] = '\0';
-    
-    DEBUG_LOG("Message payload: %s", payloadCopy);
-
-    JsonDocument doc;
-    DeserializationError error = deserializeJson(doc, payloadCopy);
-    
-    if (error) {
-        DEBUG_LOG("JSON parsing failed: %s", error.c_str());
-        free(payloadCopy);
-        return;
-    }
-
-    {
-        MutexGuard guard(messageMutex);
-        if (!guard.isLocked()) {
-            DEBUG_LOG("Failed to acquire mutex for message handling");
-            free(payloadCopy);
-            return;
-        }
-
-        if (strcmp(topic, MQTT_FAN_COMMAND_TOPIC) == 0) {
-            handleModeMessage(doc);
-        }
-        else if (strcmp(topic, MQTT_NIGHT_MODE_COMMAND_TOPIC) == 0) {
-            handleNightModeMessage(doc);
-        }
-        else if (strcmp(topic, MQTT_RECOVERY_TOPIC) == 0) {
-            handleRecoveryMessage(doc);
-        }
-        else if (strcmp(topic, MQTT_NIGHT_SETTINGS_COMMAND_TOPIC) == 0) {
-            handleNightSettingsMessage(doc);
-        }
-    }
-
-    free(payloadCopy);
-    publishStatus();
-}
-
-void MqttManager::publishStatus() {
+bool MqttManager::setupSubscriptions() {
     MutexGuard guard(messageMutex);
     if (!guard.isLocked()) {
-        DEBUG_LOG("Failed to acquire mutex for status publish");
-        return;
+        DEBUG_LOG("Failed to acquire mutex for subscriptions");
+        return false;
     }
 
-    JsonDocument doc;
+    // Subscribe to all required topics
+    bool success = true;
+    success &= mqttClient.subscribe(MQTT_FAN_COMMAND_TOPIC);
+    success &= mqttClient.subscribe(MQTT_FAN_PRESET_COMMAND_TOPIC);
+    success &= mqttClient.subscribe(MQTT_NIGHT_MODE_COMMAND_TOPIC);
+    success &= mqttClient.subscribe(MQTT_NIGHT_SETTINGS_COMMAND_TOPIC);
+    success &= mqttClient.subscribe(MQTT_RECOVERY_TOPIC);
     
-    // Fan status
-    doc["status"] = fanController.getStatus() == FanController::Status::OK ? "ok" : "error";
-    doc["fan_pwm"] = fanController.getCurrentPWM();
-    doc["target_pwm"] = fanController.getTargetPWM();
-    doc["rpm"] = fanController.getMeasuredRPM();
-    doc["mode"] = fanController.getControlMode() == FanController::Mode::AUTO ? "auto" : "manual";
-    
-    // Temperature
-    doc["temp"] = tempSensor.getSmoothedTemp();
-    
-    // Night mode settings
-    doc["night_mode"] = fanController.isNightModeActive();
-    doc["night_start"] = fanController.getNightStartHour();
-    doc["night_end"] = fanController.getNightEndHour();
-    doc["night_max_pwm"] = FanController::convertPWMToPercent(
-        fanController.getNightMaxPWM(),
-        fanController.getConfig().minPWM,
-        fanController.getConfig().maxPWM
-    );
-
-    char buffer[512];
-    size_t n = serializeJson(doc, buffer);
-    
-    if (mqttClient.connected()) {
-        bool success = mqttClient.publish(MQTT_FAN_STATE_TOPIC, buffer, true); // Set retain flag
-        DEBUG_LOG("Status published (success: %d): %s", success, buffer);
-    } else {
-        DEBUG_LOG("Cannot publish status - not connected");
-    }
-}
-void MqttManager::publishJson(const char* topic, const JsonDocument& doc) {
-    char buffer[256];
-    size_t n = serializeJson(doc, buffer);
-    
-    if (mqttClient.connected()) {
-        bool success = mqttClient.publish(topic, buffer);
-        DEBUG_LOG("Published to %s (success: %d): %s", topic, success, buffer);
-    }
+    DEBUG_LOG("Subscriptions setup %s", success ? "successful" : "failed");
+    return success;
 }
 
-void MqttManager::handleNightSettingsMessage(const JsonDocument& doc) {
-    DEBUG_LOG("Processing night settings message: %s", doc.as<String>().c_str());
-
-    // Check for required fields
-    if (!doc.containsKey("start_hour") || 
-        !doc.containsKey("end_hour") || 
-        !doc.containsKey("max_pwm")) {
-        DEBUG_LOG("Night settings message missing required fields");
+void MqttManager::messageCallback(char* topic, byte* payload, unsigned int length) {
+    if (!instance) {
+        DEBUG_LOG("No MQTT instance available for callback");
         return;
     }
-
-    // Validate field types
-    if (!doc["start_hour"].is<int>() || 
-        !doc["end_hour"].is<int>() || 
-        !doc["max_pwm"].is<int>()) {
-        DEBUG_LOG("Night settings fields have invalid types");
-        return;
+    
+    DEBUG_LOG("Message received - Topic: %s, Length: %u", topic, length);
+    
+    if (!instance->enqueueMessage(topic, payload, length)) {
+        DEBUG_LOG("Failed to enqueue MQTT message");
     }
-
-    // Get values
-    int startHour = doc["start_hour"];
-    int endHour = doc["end_hour"];
-    int maxPWM = doc["max_pwm"];
-
-    // Validate ranges
-    if (startHour < 0 || startHour > 23 || 
-        endHour < 0 || endHour > 23 || 
-        maxPWM < 0 || maxPWM > 100) {
-        DEBUG_LOG("Night settings values out of range");
-        return;
-    }
-
-    // Convert PWM percentage to raw value using the new static method
-    uint8_t rawMaxPWM = FanController::convertPercentToPWM(
-        maxPWM, 
-        fanController.getConfig().minPWM, 
-        fanController.getConfig().maxPWM
-    );
-
-    // Update settings
-    bool result = fanController.setNightSettings(startHour, endHour, rawMaxPWM);
-    DEBUG_LOG("Night settings update result: %s", result ? "success" : "failed");
 }
