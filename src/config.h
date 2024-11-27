@@ -23,7 +23,7 @@ enum class SystemState {
 // Debug Configuration
 #define DEBUG_WIFI false
 #define DEBUG_TEMP false
-#define DEBUG_PWM  false
+#define DEBUG_FAN  false
 #define DEBUG_MAIN false
 #define DEBUG_MQTT false
 #define DEBUG_DISPLAY false

@@ -3,7 +3,7 @@
  * @brief Implementation of the FanController class for PWM-based fan control
  */
 
-#define DEBUG_LOG(msg, ...) if (DEBUG_PWM) { Serial.printf(msg "\n", ##__VA_ARGS__); }
+#define DEBUG_LOG(msg, ...) if (DEBUG_FAN) { Serial.printf(msg "\n", ##__VA_ARGS__); }
 
 #include "fan_controller.h"
 #include "temp_sensor.h"
@@ -344,12 +344,18 @@ bool FanController::isNightTime() const {
     struct tm *timeinfo = localtime(&now);
     int currentHour = timeinfo->tm_hour;
     
+    bool isNight;
     if (config.nightStartHour < config.nightEndHour) {
-        return currentHour >= config.nightStartHour && currentHour < config.nightEndHour;
+        isNight = currentHour >= config.nightStartHour && currentHour < config.nightEndHour;
     } else {
         // Handles cases like 22:00 to 06:00
-        return currentHour >= config.nightStartHour || currentHour < config.nightEndHour;
+        isNight = currentHour >= config.nightStartHour || currentHour < config.nightEndHour;
     }
+    
+    DEBUG_LOG("Time check - Current hour: %d, Start: %d, End: %d, Is night: %d", 
+              currentHour, config.nightStartHour, config.nightEndHour, isNight);
+    
+    return isNight;
 }
 
 //-----------------------------------------------------------------------------
