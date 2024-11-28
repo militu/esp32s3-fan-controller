@@ -1,0 +1,5 @@
+
+[wokwi]
+version = 1
+firmware = '.pio/build/lilygo/firmware.bin'
+elf = '.pio/build/lilygo/firmware.elf'
