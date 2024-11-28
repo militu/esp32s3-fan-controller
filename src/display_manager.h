@@ -98,13 +98,14 @@ private:
         FanController::Mode controlMode;
         bool wifiConnected;
         bool mqttConnected;
-        bool nightMode;
-        
+        bool nightModeEnabled;
+        bool nightModeActive;
+
         UICommand() {} // Default constructor
         
         UICommand(float temp, uint8_t current, uint8_t target, 
                  FanController::Mode mode, bool wifi, 
-                 bool mqtt, bool night)
+                 bool mqtt, bool nightEnabled, bool nightActive)
             : type(CommandType::UPDATE_DISPLAY)
             , temperature(temp)
             , currentSpeed(current)
@@ -112,7 +113,8 @@ private:
             , controlMode(mode)
             , wifiConnected(wifi)
             , mqttConnected(mqtt)
-            , nightMode(night) {}
+            , nightModeEnabled(nightEnabled)
+            , nightModeActive(nightActive) {}
     };
 
     QueueHandle_t uiCommandQueue;

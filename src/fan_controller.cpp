@@ -278,6 +278,13 @@ bool FanController::isNightModeEnabled() const {
     return nightModeEnabled;
 }
 
+bool FanController::isNightModeActive() const {
+    MutexGuard guard(mutex);
+    if (!guard.isLocked()) return false;
+    
+    return nightModeEnabled && isNightTime();
+}
+
 uint8_t FanController::getNightStartHour() const {
     MutexGuard guard(mutex);
     if (!guard.isLocked()) return 0;

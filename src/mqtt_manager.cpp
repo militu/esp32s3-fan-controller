@@ -472,7 +472,8 @@ void MqttManager::publishStatus() {
     doc["rpm"] = fanController.getMeasuredRPM();
     doc["mode"] = fanController.getControlMode() == FanController::Mode::AUTO ? "auto" : "manual";
     doc["temp"] = tempSensor.getSmoothedTemp();
-    doc["night_mode"] = fanController.isNightModeEnabled();
+    doc["night_mode_enabled"] = fanController.isNightModeEnabled();
+    doc["night_mode_active"] = fanController.isNightModeActive();
     doc["night_start"] = fanController.getNightStartHour();
     doc["night_end"] = fanController.getNightEndHour();
     doc["night_max_speed"] = fanController.getNightMaxSpeed();
