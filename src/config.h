@@ -21,15 +21,16 @@ enum class SystemState {
 #define STATUS_LED_PIN 33
 
 // Debug Configuration
-#define DEBUG_WIFI true
+#define DEBUG_WIFI false
 #define DEBUG_TEMP false
 #define DEBUG_FAN  true
 #define DEBUG_MAIN false
-#define DEBUG_MQTT true
-#define DEBUG_DISPLAY true
+#define DEBUG_MQTT false
+#define DEBUG_DISPLAY false
 #define DEBUG_TM false
-#define DEBUG_NTP true
-#define DEBUG_INITIALIZER true
+#define DEBUG_NTP false
+#define DEBUG_INITIALIZER false
+#define DEBUG_PERSISTENT true
 
 /*******************************************************************************
  * WiFi Configuration
@@ -99,6 +100,10 @@ enum class SystemState {
 #define FAN_STATUS_STALLED      2
 #define FAN_STATUS_OVERCURRENT  3
 #define FAN_STATUS_ERROR        4
+
+// Defaults
+#define DEFAULT_FAN_MODE      "AUTO"  
+
 
 // Fan Control Modes
 enum class FanMode {

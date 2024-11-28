@@ -1,6 +1,8 @@
 # ESP32 Fan Controller
 
-A fan controller system built with ESP32, featuring temperature-based control, MQTT integration, and a TFT display interface. (including a wokwi simulation)
+A fan controller system built with ESP32, featuring temperature-based control, MQTT integration, persistent configuration, and a TFT display interface. (including a wokwi simulation)
+
+[![ESP32 Fan Controller Wokwi Screenshot](./assets/wokwi-screenshot.png)](./assets/wokwi-screenshot.png)
 
 ## Key Features
 
@@ -18,6 +20,7 @@ A fan controller system built with ESP32, featuring temperature-based control, M
   - Stall detection and automatic recovery
   - Configurable minimum and maximum speed limits
   - RPM feedback monitoring
+  - Persistent configuration of operating mode and settings
 
 - **Night Mode**
 
@@ -25,6 +28,15 @@ A fan controller system built with ESP32, featuring temperature-based control, M
   - Automatic time-based activation with NTP sync
   - Adjustable maximum speed during night hours
   - Manual override capability
+  - Persistent night mode settings between restarts
+
+- **Configuration Persistence**
+
+  - Fan operation mode (Auto/Manual)
+  - Manual speed settings
+  - Night mode state and settings
+  - Settings preserved across power cycles
+  - ESP32's Non-Volatile Storage (NVS) based
 
 - **Display Interface**
 
@@ -133,13 +145,30 @@ For a complete list of configuration options, including debug settings, WiFi par
 │   ├── core/
 │   │   ├── fan_controller.*   # Fan control logic
 │   │   ├── temp_sensor.*      # Temperature monitoring
-│   │   └── task_manager.*     # FreeRTOS management
+│   │   ├── task_manager.*     # FreeRTOS management
+│   │   └── config_preference.* # Persistent configuration
 │   ├── network/
 │   │   ├── mqtt_manager.*     # MQTT communication
 │   │   ├── wifi_manager.*     # WiFi connectivity
 │   │   └── ntp_manager.*      # Time synchronization
 │   └── config.h              # System configuration
 ```
+
+## Configuration Persistence
+
+The system maintains the following settings across power cycles:
+
+```cpp
+// Persistent Fan Settings
+- Fan Operation Mode (Auto/Manual)
+- Manual Speed Setting
+- Night Mode State (Enabled/Disabled)
+- Night Mode Start Hour
+- Night Mode End Hour
+- Night Mode Maximum Speed
+```
+
+These settings are automatically saved when changed and restored on system startup.
 
 ## Building and Installation
 

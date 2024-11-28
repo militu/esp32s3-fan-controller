@@ -8,6 +8,7 @@
 #include "mutex_guard.h"
 #include "ntp_manager.h"
 #include "debug_log.h"
+#include "config_preference.h"
 
 // Forward declarations
 class TempSensor;
@@ -75,7 +76,7 @@ public:
     static constexpr EventBits_t CONTROL_MODE_CHANGED = (1 << 2);
 
     // Constructor and destructor
-    explicit FanController(TaskManager& taskManager);
+    explicit FanController(TaskManager& taskManager, ConfigPreference& config);
     ~FanController();
 
     // Prevent copying
@@ -122,6 +123,10 @@ public:
     static int convertPWMToSpeed(uint8_t pwm, uint8_t minPWM, uint8_t maxPWM) {
         return map(pwm, minPWM, maxPWM, 0, 100);
     }
+
+    // Save and load preferences
+    void saveSettings(ConfigPreference& configPref);
+    void loadSettings(ConfigPreference& configPref);
 
 private:
     // Constants
@@ -176,4 +181,7 @@ private:
     // Utility methods
     uint8_t SpeedToRawPWM(int percent) const;
     int rawPWMToSpeed(uint8_t raw) const;
+
+    // Config Preference
+    ConfigPreference& configPreference;
 };
