@@ -13,5 +13,6 @@
 #define DEBUG_LOG_FAN(msg, ...) if (DEBUG_FAN) { Serial.printf(msg "\n", ##__VA_ARGS__); }
 #define DEBUG_LOG_DISPLAY(msg, ...) if (DEBUG_DISPLAY) { Serial.printf(msg "\n", ##__VA_ARGS__); }
 #define DEBUG_LOG_TM(msg, ...) if (DEBUG_TM) { Serial.printf(msg "\n", ##__VA_ARGS__); }
+#define DEBUG_LOG_PERSISTENT(msg, ...) if (DEBUG_PERSISTENT) { Serial.printf(msg "\n", ##__VA_ARGS__); }
 
 #endif // DEBUG_LOG_H

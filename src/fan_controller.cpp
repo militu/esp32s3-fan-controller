@@ -552,6 +552,9 @@ void FanController::registerNTPManager(NTPManager* manager) {
 //-----------------------------------------------------------------------------
 
 void FanController::saveSettings(ConfigPreference& configPref) {
+    DEBUG_LOG_FAN("Saving settings - Mode: %d, Speed: %d, NightMode: %d", 
+                  static_cast<uint8_t>(mode), currentSpeed, nightModeEnabled);
+                  
     ConfigPreference::FanSettings settings;
     settings.fanMode = static_cast<uint8_t>(mode);
     settings.manualSpeed = currentSpeed;
@@ -563,8 +566,12 @@ void FanController::saveSettings(ConfigPreference& configPref) {
 }
 
 void FanController::loadSettings(ConfigPreference& configPref) {
+    DEBUG_LOG_FAN("Loading fan settings...");
     ConfigPreference::FanSettings settings;
     if (configPref.loadFanSettings(settings)) {
+        DEBUG_LOG_FAN("Loaded - Mode: %d, Speed: %d, NightMode: %d", 
+                     settings.fanMode, settings.manualSpeed, settings.nightModeEnabled);
+                     
         mode = static_cast<Mode>(settings.fanMode);
         if (mode == Mode::MANUAL) {
             setSpeedDutyCycle(settings.manualSpeed);
@@ -573,5 +580,7 @@ void FanController::loadSettings(ConfigPreference& configPref) {
         setNightSettings(settings.nightStartHour, 
                         settings.nightEndHour, 
                         settings.nightMaxSpeed);
+    } else {
+        DEBUG_LOG_FAN("Failed to load settings or using defaults");
     }
 }

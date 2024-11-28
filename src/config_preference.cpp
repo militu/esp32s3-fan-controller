@@ -1,5 +1,6 @@
 #include "config_preference.h"
 #include "fan_controller.h"
+#include "debug_log.h"
 
 ConfigPreference::ConfigPreference() 
     : mutex(xSemaphoreCreateMutex())
@@ -37,6 +38,11 @@ bool ConfigPreference::saveFanSettings(const FanSettings& settings) {
     }
 
     prefs.putUChar("fanMode", settings.fanMode);
+    DEBUG_LOG_PERSISTENT("SAVE CONFIG: FanMode=%d\n", settings.fanMode);
+    DEBUG_LOG_PERSISTENT("SAVE CONFIG: ManSpeed=%d\n", settings.manualSpeed);
+    DEBUG_LOG_PERSISTENT("SAVE CONFIG: NightMode=%d\n", settings.nightModeEnabled);
+
+    // Rest of the save operations...
     prefs.putUChar("manSpeed", settings.manualSpeed);
     prefs.putBool("nightMode", settings.nightModeEnabled);
     prefs.putUChar("nightStart", settings.nightStartHour);
@@ -54,12 +60,18 @@ bool ConfigPreference::loadFanSettings(FanSettings& settings) {
     }
 
     settings.fanMode = prefs.getUChar("fanMode", 0);  // 0 = AUTO mode
+    DEBUG_LOG_PERSISTENT("LOAD CONFIG: FanMode=%d\n", settings.fanMode);
+    
+    settings.manualSpeed = prefs.getUChar("manSpeed", FAN_MIN_SPEED);
+    DEBUG_LOG_PERSISTENT("LOAD CONFIG: ManSpeed=%d\n", settings.manualSpeed);
+    
+    settings.nightModeEnabled = prefs.getBool("nightMode", false);
+    DEBUG_LOG_PERSISTENT("LOAD CONFIG: NightMode=%d\n", settings.nightModeEnabled);
+
+    // Rest of the load operations...
     if (settings.fanMode > 1) {  // If ERROR or invalid, set to AUTO
         settings.fanMode = 0;
     }
-
-    settings.manualSpeed = prefs.getUChar("manSpeed", FAN_MIN_SPEED);
-    settings.nightModeEnabled = prefs.getBool("nightMode", false);
     settings.nightStartHour = prefs.getUChar("nightStart", NIGHT_MODE_START);
     settings.nightEndHour = prefs.getUChar("nightEnd", NIGHT_MODE_END);
     settings.nightMaxSpeed = prefs.getUChar("nightSpeed", NIGHT_MODE_MAX_SPEED);
