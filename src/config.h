@@ -100,6 +100,10 @@ enum class SystemState {
 #define FAN_STATUS_OVERCURRENT  3
 #define FAN_STATUS_ERROR        4
 
+// Defaults
+#define DEFAULT_FAN_MODE      "AUTO"  
+
+
 // Fan Control Modes
 enum class FanMode {
     AUTO,

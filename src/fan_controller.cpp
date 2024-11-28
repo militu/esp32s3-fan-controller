@@ -13,8 +13,9 @@ volatile uint32_t FanController::pulseCount = 0;
 // Constructor & Destructor
 //-----------------------------------------------------------------------------
 
-FanController::FanController(TaskManager& tm)
+FanController::FanController(TaskManager& tm, ConfigPreference& config)
     : taskManager(tm)
+    , configPreference(config)
     , mutex(nullptr)
     , events(nullptr)
     , tempSensor(nullptr)
@@ -114,6 +115,10 @@ bool FanController::setSpeedDutyCycle(int percentSpeed) {
     if (!guard.isLocked()) return false;
 
     updateTargetSpeed(percentSpeed);
+
+    // Save settings
+    saveSettings(configPreference);
+
     return true;
 }
 
@@ -159,6 +164,9 @@ bool FanController::setControlMode(Mode newMode) {
     if (events) {
         xEventGroupSetBits(events, CONTROL_MODE_CHANGED);
     }
+
+    // Save settings
+    saveSettings(configPreference);
     
     DEBUG_LOG_FAN("Control mode changed to: %s", 
               mode == Mode::AUTO ? "Auto" : "Manual");
@@ -182,6 +190,10 @@ bool FanController::setNightMode(bool enabled) {
     if (events) {
         xEventGroupSetBits(events, NIGHT_MODE_CHANGED);
     }
+
+    // Save settings
+    saveSettings(configPreference);
+
     return true;
 }
 
@@ -223,6 +235,9 @@ bool FanController::setNightSettings(uint8_t startHour, uint8_t endHour, int max
         // Always recalculate from original requested speed
         updateTargetSpeed(target.requestedSpeed);
     }
+
+    // Save settings
+    saveSettings(configPreference);
 
     return true;
 }
@@ -529,5 +544,34 @@ void FanController::registerNTPManager(NTPManager* manager) {
     MutexGuard guard(mutex);
     if (guard.isLocked()) {
         ntpManager = manager;
+    }
+}
+
+//-----------------------------------------------------------------------------
+// Save and load preferences
+//-----------------------------------------------------------------------------
+
+void FanController::saveSettings(ConfigPreference& configPref) {
+    ConfigPreference::FanSettings settings;
+    settings.fanMode = static_cast<uint8_t>(mode);
+    settings.manualSpeed = currentSpeed;
+    settings.nightModeEnabled = nightModeEnabled;
+    settings.nightStartHour = config.nightStartHour;
+    settings.nightEndHour = config.nightEndHour;
+    settings.nightMaxSpeed = config.nightMaxSpeed;
+    configPref.saveFanSettings(settings);
+}
+
+void FanController::loadSettings(ConfigPreference& configPref) {
+    ConfigPreference::FanSettings settings;
+    if (configPref.loadFanSettings(settings)) {
+        mode = static_cast<Mode>(settings.fanMode);
+        if (mode == Mode::MANUAL) {
+            setSpeedDutyCycle(settings.manualSpeed);
+        }
+        setNightMode(settings.nightModeEnabled);
+        setNightSettings(settings.nightStartHour, 
+                        settings.nightEndHour, 
+                        settings.nightMaxSpeed);
     }
 }

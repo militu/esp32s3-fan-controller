@@ -17,14 +17,16 @@
 #include "display_config.h"
 #include "system_initializer.h"
 #include "debug_log.h"
+#include "config_preference.h"
 
 // System component instances
 TaskManager taskManager;
 WifiManager wifiManager(taskManager);
 TempSensor tempSensor(taskManager);
-FanController fanController(taskManager);
-MqttManager mqttManager(taskManager, tempSensor, fanController);
 NTPManager ntpManager(taskManager);
+ConfigPreference configPreference;
+FanController fanController(taskManager, configPreference);
+MqttManager mqttManager(taskManager, tempSensor, fanController);
 
 // Display initialization based on board type
 #ifdef USE_LILYGO_S3
@@ -41,10 +43,15 @@ void setup() {
     delay(1000);
     Serial.println("\nESP32 System Starting...");
 
+    if (!configPreference.begin()) {
+        Serial.println("Config preference initialization failed!");
+        return;
+    }
+
     SystemInitializer initializer(
         taskManager, displayManager, &display, 
         wifiManager, ntpManager, mqttManager,
-        tempSensor, fanController
+        tempSensor, fanController, configPreference
     );
     
     if (!initializer.initialize()) {

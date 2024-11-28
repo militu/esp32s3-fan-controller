@@ -10,7 +10,8 @@ public:
                      NTPManager& ntp,
                      MqttManager& mqtt,
                      TempSensor& temp,
-                     FanController& fan)
+                     FanController& fan,
+                     ConfigPreference& config)
         : taskManager(tasks)
         , displayManager(display)
         , displayDriver(driver)
@@ -18,7 +19,8 @@ public:
         , ntpManager(ntp)
         , mqttManager(mqtt)
         , tempSensor(temp)
-        , fanController(fan) {}
+        , fanController(fan)
+        , configPreference(config) {}
 
 bool initialize() {
     // Critical components must succeed
@@ -68,7 +70,8 @@ private:
     MqttManager& mqttManager;
     TempSensor& tempSensor;
     FanController& fanController;
-    
+    ConfigPreference& configPreference;
+
     static constexpr uint32_t WIFI_TIMEOUT = 10000;
     static constexpr uint32_t MQTT_TIMEOUT = 10000;
 
@@ -112,6 +115,9 @@ private:
             DEBUG_LOG_INIT("Fan controller initialization failed!");
             return false;
         }
+        fanController.loadSettings(configPreference);
+
+
         return true;
     }
 
