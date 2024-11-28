@@ -180,6 +180,182 @@ These settings are automatically saved when changed and restored on system start
    pio run -t upload
    ```
 
+## Home Assistant Integration
+
+### MQTT Configuration
+
+Add the following configuration to your Home Assistant's MQTT configuration (e.g., `configuration.yaml` or through the MQTT integration):
+
+```yaml
+mqtt:
+  sensor:
+    - name: "ESP32 Fan Temperature"
+      state_topic: "fan_controller_topic/status"
+      value_template: "{{ value_json.temp }}"
+      unit_of_measurement: "°C"
+      availability_topic: "fan_controller_topic/available"
+      payload_available: "online"
+      payload_not_available: "offline"
+      expire_after: 30
+
+    - name: "ESP32 Fan RPM"
+      state_topic: "fan_controller_topic/status"
+      value_template: "{{ value_json.rpm }}"
+      unit_of_measurement: "RPM"
+      availability_topic: "fan_controller_topic/available"
+      payload_available: "online"
+      payload_not_available: "offline"
+      expire_after: 30
+
+    - name: "ESP32 Fan Current Speed"
+      state_topic: "fan_controller_topic/status"
+      value_template: "{{ value_json.fan_speed }}"
+      unit_of_measurement: "%"
+      availability_topic: "fan_controller_topic/available"
+      payload_available: "online"
+      payload_not_available: "offline"
+      expire_after: 30
+
+  switch:
+    - name: "ESP32 Fan Night Mode"
+      state_topic: "fan_controller_topic/status"
+      command_topic: "fan_controller_topic/night_mode"
+      value_template: "{{ value_json.night_mode_enabled }}"
+      payload_on: '{"enabled":true}'
+      payload_off: '{"enabled":false}'
+      state_on: true
+      state_off: false
+      icon: "mdi:weather-night"
+      availability_topic: "fan_controller_topic/available"
+
+  number:
+    - name: "ESP32 Fan Manual Speed"
+      state_topic: "fan_controller_topic/status"
+      value_template: "{{ value_json.fan_speed }}"
+      command_topic: "fan_controller_topic/mode"
+      command_template: '{"mode": "manual", "speed": {{ value }} }'
+      min: 0
+      max: 100
+      step: 1
+      icon: "mdi:fan"
+
+    - name: "ESP32 Fan Night Start Hour"
+      state_topic: "fan_controller_topic/status"
+      value_template: "{{ value_json.night_start }}"
+      command_topic: "fan_controller_topic/night_settings"
+      command_template: >
+        {"start_hour": {{ value }}, "end_hour": {{ states('number.esp32_fan_night_end_hour') }}, "max_speed": {{ states('number.esp32_fan_night_max_speed') }}}
+      min: 0
+      max: 23
+      step: 1
+
+    - name: "ESP32 Fan Night End Hour"
+      state_topic: "fan_controller_topic/status"
+      value_template: "{{ value_json.night_end }}"
+      command_topic: "fan_controller_topic/night_settings"
+      command_template: >
+        {"start_hour": {{ states('number.esp32_fan_night_start_hour') }}, "end_hour": {{ value }}, "max_speed": {{ states('number.esp32_fan_night_max_speed') }}}
+      min: 0
+      max: 23
+      step: 1
+
+    - name: "ESP32 Fan Night Max Speed"
+      state_topic: "fan_controller_topic/status"
+      value_template: "{{ value_json.night_max_speed }}"
+      command_topic: "fan_controller_topic/night_settings"
+      command_template: >
+        {"start_hour": {{ states('number.esp32_fan_night_start_hour') }}, "end_hour": {{ states('number.esp32_fan_night_end_hour') }}, "max_speed": {{ value }}}
+      min: 0
+      max: 100
+      step: 1
+
+  select:
+    - name: "ESP32 Fan Mode"
+      state_topic: "fan_controller_topic/status"
+      command_topic: "fan_controller_topic/mode"
+      value_template: "{{ value_json.mode }}"
+      options:
+        - "auto"
+        - "manual"
+      command_template: '{"mode": "{{ value }}"}'
+
+  button:
+    - name: "ESP32 Fan Recovery"
+      command_topic: "fan_controller_topic/recovery"
+      payload_press: '{"recover": true}'
+```
+
+### Dashboard Card Configuration
+
+Create a custom dashboard card using this YAML configuration:
+
+```yaml
+type: vertical-stack
+cards:
+  - type: vertical-stack
+    cards:
+      - type: custom:mini-graph-card
+        entities:
+          - entity: sensor.esp32_fan_temperature
+            name: Temperature
+          - entity: sensor.esp32_fan_rpm
+            name: RPM
+            y_axis: secondary
+        hours_to_show: 24
+        points_per_hour: 4
+        line_width: 2
+        hour24: true
+        show:
+          labels: true
+          points: false
+          legend: true
+      - type: entities
+        title: Fan Control
+        show_header_toggle: false
+        entities:
+          - entity: select.esp32_fan_mode
+            name: Fan Mode
+          - type: conditional
+            conditions:
+              - entity: select.esp32_fan_mode
+                state: manual
+            row:
+              entity: number.esp32_fan_manual_speed
+              name: Fan Speed
+              icon: mdi:fan
+          - type: custom:mushroom-entity-card
+            entity: switch.esp32_fan_night_mode
+            name: Night Mode
+            icon: mdi:weather-night
+            tap_action:
+              action: toggle
+            fill_container: false
+          - entity: number.esp32_fan_night_start_hour
+            name: Night Start
+            icon: mdi:clock-start
+          - entity: number.esp32_fan_night_end_hour
+            name: Night End
+            icon: mdi:clock-end
+          - entity: number.esp32_fan_night_max_speed
+            name: Night Max Speed
+            icon: mdi:speedometer
+          - type: button
+            name: Recovery
+            icon: mdi:restart
+            tap_action:
+              action: call-service
+              service: button.press
+              target:
+                entity_id: button.esp32_fan_recovery
+```
+
+Requirements:
+
+- MQTT integration must be configured in Home Assistant
+- Custom cards required:
+  - [mini-graph-card](https://github.com/kalkih/mini-graph-card)
+  - [mushroom-cards](https://github.com/piitaya/lovelace-mushroom)
+
 ## License
 
 This project is licensed under the MIT License. See LICENSE file for details.
