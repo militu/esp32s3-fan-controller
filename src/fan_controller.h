@@ -98,6 +98,7 @@ public:
     uint8_t getNightStartHour() const;
     uint8_t getNightEndHour() const;
     uint8_t getNightMaxSpeed() const;
+    bool isNightModeActive() const;
 
     // Status getters
     int getCurrentSpeed() const;          ///< Get current speed (PWM) (0-100%)

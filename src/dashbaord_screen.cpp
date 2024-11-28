@@ -77,13 +77,13 @@ void DashboardScreen::createUI() {
  * @brief Updates all UI elements with current system state
  */
 void DashboardScreen::update(float temp, int fanSpeed, int targetSpeed, FanController::Mode mode,
-                      bool wifiConnected, bool mqttConnected, bool nightMode) {
+                      bool wifiConnected, bool mqttConnected, bool nightModeEnabled, bool nightModeActive) {
     if (!initialized) return;
 
     updateTemperatureDisplay(temp);
-    updateStatusIndicators(wifiConnected, mqttConnected, nightMode);
+    updateStatusIndicators(wifiConnected, mqttConnected, nightModeEnabled, nightModeActive);
     updateSpeedDisplay(fanSpeed, targetSpeed);
-    updateModeDisplay(mode, nightMode);
+    updateModeDisplay(mode);
 }
 
 /**
@@ -222,7 +222,7 @@ void DashboardScreen::arcAnimCallback(void* var, int32_t value) {
     lv_arc_set_value((lv_obj_t*)var, value);
 }
 
-void DashboardScreen::updateStatusIndicators(bool wifiConnected, bool mqttConnected, bool nightMode) {
+void DashboardScreen::updateStatusIndicators(bool wifiConnected, bool mqttConnected, bool nightModeEnabled, bool nightModeActive) {
     // Update WiFi status
     lv_label_set_text(wifiLabel, wifiConnected ? LV_SYMBOL_WIFI : LV_SYMBOL_CLOSE);
     lv_obj_set_style_text_color(wifiLabel, 
@@ -230,9 +230,15 @@ void DashboardScreen::updateStatusIndicators(bool wifiConnected, bool mqttConnec
         LV_STATE_DEFAULT);
 
     // Update night mode status
-    lv_obj_set_style_text_color(nightLabel, 
-        nightMode ? lv_color_hex(0x8080FF) : lv_color_hex(0x404040),
-        LV_STATE_DEFAULT);
+    lv_color_t nightColor;
+    if (nightModeActive) {
+        nightColor = lv_color_hex(0x00FF00);  // Green
+    } else if (nightModeEnabled) {
+        nightColor = lv_color_hex(0x8080FF);  // Light blue
+    } else {
+        nightColor = lv_color_hex(0x404040);  // Dark blue
+    }
+    lv_obj_set_style_text_color(nightLabel, nightColor, LV_STATE_DEFAULT);
 
     // Update MQTT status
     lv_label_set_text(mqttLabel, mqttConnected ? "M" : "×");
@@ -259,12 +265,11 @@ void DashboardScreen::updateSpeedDisplay(int fanSpeed, int targetSpeed) {
     lv_obj_set_style_text_color(targetSpeedLabel, speedColor, LV_STATE_DEFAULT);
 }
 
-void DashboardScreen::updateModeDisplay(FanController::Mode mode, bool nightMode) {
+void DashboardScreen::updateModeDisplay(FanController::Mode mode) {
     // Update mode label
     char modeStr[32];
-    snprintf(modeStr, sizeof(modeStr), "Mode: %s%s", 
-             mode == FanController::Mode::AUTO ? "Auto" : "Manual",
-             nightMode ? " (N)" : "");
+    snprintf(modeStr, sizeof(modeStr), "Mode: %s", 
+             mode == FanController::Mode::AUTO ? "Auto" : "Manual");
     lv_label_set_text(modeLabel, modeStr);
     
     // Update color based on mode

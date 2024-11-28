@@ -44,10 +44,11 @@ public:
      * @param mode Current fan control mode (Auto/Manual)
      * @param wifiConnected WiFi connection status
      * @param mqttConnected MQTT connection status
-     * @param nightMode Night mode status
+     * @param nightModeEnabled Night mode status
+     * @param nightModeActive Night mode status
      */
     void update(float temp, int fanSpeed, int targetSpeed, FanController::Mode mode,
-                bool wifiConnected, bool mqttConnected, bool nightMode);
+                bool wifiConnected, bool mqttConnected, bool nightModeEnabled, bool nightModeActive);
 
     /**
      * @brief Returns pointer to the temperature arc widget
@@ -80,9 +81,9 @@ private:
 
     // Update Helper Methods
     void updateTemperatureDisplay(float temp);
-    void updateStatusIndicators(bool wifiConnected, bool mqttConnected, bool nightMode);
+    void updateStatusIndicators(bool wifiConnected, bool mqttConnected, bool nightModeEnabled, bool nightModeActive);
     void updateSpeedDisplay(int fanSpeed, int targetSpeed);
-    void updateModeDisplay(FanController::Mode mode, bool nightMode);
+    void updateModeDisplay(FanController::Mode mode);
 
     // Main UI Elements
     lv_obj_t* screen;            ///< Main screen container

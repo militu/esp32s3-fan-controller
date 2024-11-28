@@ -144,7 +144,8 @@ void DisplayManager::processLVGL() {
                         cmd.controlMode,
                         cmd.wifiConnected,
                         cmd.mqttConnected,
-                        cmd.nightMode
+                        cmd.nightModeEnabled,
+                        cmd.nightModeActive
                     );
                 }
                 
@@ -214,7 +215,8 @@ void DisplayManager::updateDashboardValues() {
         fanController.getControlMode(),
         wifiManager.isConnected(),
         mqttManager.isConnected(),
-        fanController.isNightModeEnabled()
+        fanController.isNightModeEnabled(),
+        fanController.isNightModeActive()
     );
 
     // Send to queue, with a short timeout
