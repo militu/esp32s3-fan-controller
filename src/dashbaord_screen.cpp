@@ -16,7 +16,16 @@ DashboardScreen::DashboardScreen()
     , wifiLabel(nullptr)
     , mqttLabel(nullptr)
     , nightLabel(nullptr)
-    , initialized(false) {
+    , initialized(false)
+    , animationInProgress(false) {
+    uiMutex = xSemaphoreCreateMutex();
+
+}
+
+DashboardScreen::~DashboardScreen() {
+    if (uiMutex != nullptr) {
+        vSemaphoreDelete(uiMutex);
+    }
 }
 
 /**
@@ -120,7 +129,8 @@ void DashboardScreen::createLeftContainer(uint16_t width, uint16_t height, uint1
 void DashboardScreen::createTemperatureArc(uint16_t size, uint16_t xPos) {
     arc = lv_arc_create(screen);
     lv_obj_set_size(arc, size, size);
-    
+    lv_obj_set_user_data(screen, this);  // Store screen reference
+
     // Position arc explicitly instead of centering
     lv_obj_set_pos(arc, xPos, (displayHeight - size) / 2);
     
@@ -192,19 +202,32 @@ lv_obj_t* DashboardScreen::createInfoLabel(lv_obj_t* parent, lv_align_t align, l
 }
 
 void DashboardScreen::updateTemperatureDisplay(float temp) {
+    MutexGuard guard(uiMutex, pdMS_TO_TICKS(10));
+    if (!guard.isLocked()) return;
+
     int targetValue = constrain((int)(temp * 2), 0, 100);
     
-    // Create smooth animation
-    lv_anim_init(&arcAnim);
-    lv_anim_set_var(&arcAnim, arc);
-    lv_anim_set_exec_cb(&arcAnim, arcAnimCallback);
-    lv_anim_set_values(&arcAnim, currentArcValue, targetValue);
-    lv_anim_set_time(&arcAnim, 2000);  // 2 seconds
-    lv_anim_set_repeat_delay(&arcAnim, 500);  // 500ms delay between repeats
-    lv_anim_set_path_cb(&arcAnim, lv_anim_path_ease_in_out);
-    lv_anim_start(&arcAnim);
-    
-    currentArcValue = targetValue;
+    // Only start new animation if we're not already animating and value changed
+    if (!animationInProgress && targetValue != currentArcValue) {
+        // Create smooth animation
+        lv_anim_t anim;
+        lv_anim_init(&anim);
+        lv_anim_set_var(&anim, arc);
+        lv_anim_set_exec_cb(&anim, arcAnimCallback);
+        lv_anim_set_values(&anim, currentArcValue, targetValue);
+        lv_anim_set_time(&anim, 1000);  // 1 second - faster than before
+        lv_anim_set_path_cb(&anim, lv_anim_path_ease_out); // Smooth easing
+        
+        // Add a ready callback to know when animation is done
+        lv_anim_set_ready_cb(&anim, [](lv_anim_t* a) {
+            auto screen = static_cast<DashboardScreen*>(lv_obj_get_user_data(lv_obj_get_parent(static_cast<lv_obj_t*>(a->var))));
+            screen->animationInProgress = false;
+        });
+        
+        animationInProgress = true;
+        lv_anim_start(&anim);
+        currentArcValue = targetValue;
+    }
 
     // Update temperature label
     char tempStr[32];
@@ -223,6 +246,9 @@ void DashboardScreen::arcAnimCallback(void* var, int32_t value) {
 }
 
 void DashboardScreen::updateStatusIndicators(bool wifiConnected, bool mqttConnected, bool nightModeEnabled, bool nightModeActive) {
+    MutexGuard guard(uiMutex, pdMS_TO_TICKS(10));
+    if (!guard.isLocked()) return;
+
     // Update WiFi status
     lv_label_set_text(wifiLabel, wifiConnected ? LV_SYMBOL_WIFI : LV_SYMBOL_CLOSE);
     lv_obj_set_style_text_color(wifiLabel, 
@@ -248,6 +274,9 @@ void DashboardScreen::updateStatusIndicators(bool wifiConnected, bool mqttConnec
 }
 
 void DashboardScreen::updateSpeedDisplay(int fanSpeed, int targetSpeed) {
+    MutexGuard guard(uiMutex, pdMS_TO_TICKS(10));
+    if (!guard.isLocked()) return;
+
     // Update speed labels
     char currentStr[32], targetStr[32];
     snprintf(currentStr, sizeof(currentStr), "Current: %d%%", fanSpeed);
@@ -266,6 +295,9 @@ void DashboardScreen::updateSpeedDisplay(int fanSpeed, int targetSpeed) {
 }
 
 void DashboardScreen::updateModeDisplay(FanController::Mode mode) {
+    MutexGuard guard(uiMutex, pdMS_TO_TICKS(10));
+    if (!guard.isLocked()) return;
+    
     // Update mode label
     char modeStr[32];
     snprintf(modeStr, sizeof(modeStr), "Mode: %s", 

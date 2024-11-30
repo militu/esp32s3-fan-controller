@@ -77,14 +77,16 @@ private:
     // LVGL task handling
     static void lvglTask(void* parameters);
     void processLVGL();
+    static void uiUpdateTask(void* parameters);
+    void processUIUpdates();
     static void flush_cb(lv_disp_drv_t* disp_drv, const lv_area_t* area, lv_color_t* color_p);
     void updateDashboardValues();
 
     // Constants
-    static constexpr uint32_t LVGL_STACK_SIZE = 4096;
+    static constexpr uint32_t LVGL_STACK_SIZE = 8192;
     static constexpr UBaseType_t LVGL_TASK_PRIORITY = 1;  // Higher than other tasks
-    static constexpr BaseType_t LVGL_TASK_CORE = 1;
-    static constexpr uint32_t UPDATE_INTERVAL = 10;  // 20Hz updates
+    static constexpr BaseType_t LVGL_TASK_CORE = 0;
+    static constexpr uint32_t UPDATE_INTERVAL = 16;  // 20Hz updates
 
     struct UICommand {
         enum class CommandType {
