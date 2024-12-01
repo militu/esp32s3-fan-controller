@@ -35,24 +35,24 @@ bool initialize() {
         return false;
     }
 
-    // // Network components - try in correct order but continue if they fail
-    // bool wifiSuccess = initializeWifi();
+    // Network components - try in correct order but continue if they fail
+    bool wifiSuccess = initializeWifi();
     
-    // // Only try NTP and MQTT if WiFi succeeded
-    // bool ntpSuccess = false;
-    // bool mqttSuccess = false;
+    // Only try NTP and MQTT if WiFi succeeded
+    bool ntpSuccess = false;
+    bool mqttSuccess = false;
     
-    // if (wifiSuccess) {
-    //     ntpSuccess = initializeNTP();
-    //     mqttSuccess = initializeMQTT();
-    // } else {
-    //     DEBUG_LOG_INIT("Skipping NTP and MQTT initialization due to WiFi failure");
-    // }
+    if (wifiSuccess) {
+        ntpSuccess = initializeNTP();
+        mqttSuccess = initializeMQTT();
+    } else {
+        DEBUG_LOG_INIT("Skipping NTP and MQTT initialization due to WiFi failure");
+    }
 
-    // DEBUG_LOG_INIT("Initialization complete - WiFi: %d, NTP: %d, MQTT: %d", 
-    //           wifiSuccess, ntpSuccess, mqttSuccess);
+    DEBUG_LOG_INIT("Initialization complete - WiFi: %d, NTP: %d, MQTT: %d", 
+              wifiSuccess, ntpSuccess, mqttSuccess);
 
-    // delay(1000);
+    delay(1000);
 
     // Switch to dashboard screen after initialization attempts
     displayManager.switchToDashboardUI();
@@ -92,9 +92,9 @@ private:
     }
 
     bool initializeNetworkComponents() {
-        // if (!initializeWifi()) return false;
-        // if (!initializeNTP()) return false;
-        // if (!initializeMQTT()) return false;
+        if (!initializeWifi()) return false;
+        if (!initializeNTP()) return false;
+        if (!initializeMQTT()) return false;
         return true;
     }
 

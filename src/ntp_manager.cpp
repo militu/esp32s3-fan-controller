@@ -217,6 +217,6 @@ void NTPManager::ntpTask(void* parameters) {
     while (true) {
         ntp->taskManager.updateTaskRunTime("NTP");
         ntp->processUpdate();
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }

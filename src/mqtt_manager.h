@@ -89,11 +89,13 @@ private:
     static constexpr size_t QUEUE_SIZE = 10;
     static constexpr uint32_t QUEUE_TIMEOUT_MS = 100;
     static constexpr uint32_t MUTEX_TIMEOUT_MS = 1000;
+
     static constexpr uint32_t MQTT_STACK_SIZE = 8192;
-    static constexpr UBaseType_t MQTT_TASK_PRIORITY = 3;
+    static constexpr UBaseType_t MQTT_TASK_PRIORITY = 2;
     static constexpr BaseType_t MQTT_TASK_CORE = 1;
-    static constexpr unsigned long AVAILABILITY_INTERVAL = 30000;  // 30 seconds
-    static constexpr uint32_t CLIENT_LOOP_INTERVAL = 50; 
+
+    static constexpr unsigned long AVAILABILITY_INTERVAL = 60000;
+    static constexpr uint32_t CLIENT_LOOP_INTERVAL = 100;
 
     // Message structure
     struct MQTTMessage {

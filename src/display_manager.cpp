@@ -96,14 +96,14 @@ bool DisplayManager::begin(DisplayDriver* displayDriver) {
         return false;
     }
 
-    TaskManager::TaskConfig uiConfig{
+    TaskManager::TaskConfig uiUpdateConfig{
         "UI_Updates",
-        4096,  // Smaller stack size is fine
-        LVGL_TASK_PRIORITY - 1,  // Lower priority than LVGL task
-        LVGL_TASK_CORE
+        UI_UPDATE_STACK_SIZE,
+        UI_UPDATE_TASK_PRIORITY,
+        UI_UPDATE_TASK_CORE
     };
     
-    err = taskManager.createTask(uiConfig, uiUpdateTask, this);
+    err = taskManager.createTask(uiUpdateConfig, uiUpdateTask, this);
     if (err != ESP_OK) {
         DEBUG_LOG_DISPLAY("DisplayManager: UI task creation failed with error %d", err);
         return false;
@@ -188,7 +188,7 @@ void DisplayManager::processUIUpdates() {
                 break;
         }
         
-        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(20));  // 50Hz is enough for UI updates
+        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(LVGL_TASK_DELAY));
     }
 }
 

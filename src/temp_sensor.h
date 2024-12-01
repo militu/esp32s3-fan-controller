@@ -84,7 +84,7 @@ private:
 
     // Task configuration constants
     static constexpr uint32_t TEMP_STACK_SIZE = 4096;
-    static constexpr UBaseType_t TEMP_TASK_PRIORITY = 2;
+    static constexpr UBaseType_t TEMP_TASK_PRIORITY = 3;
     static constexpr BaseType_t TEMP_TASK_CORE = 1;
 };
 

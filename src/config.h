@@ -23,14 +23,14 @@ enum class SystemState {
 // Debug Configuration
 #define DEBUG_WIFI false
 #define DEBUG_TEMP false
-#define DEBUG_FAN  true
+#define DEBUG_FAN  false
 #define DEBUG_MAIN false
 #define DEBUG_MQTT false
 #define DEBUG_DISPLAY false
 #define DEBUG_TM false
 #define DEBUG_NTP false
 #define DEBUG_INITIALIZER false
-#define DEBUG_PERSISTENT true
+#define DEBUG_PERSISTENT false
 
 /*******************************************************************************
  * WiFi Configuration
@@ -38,8 +38,8 @@ enum class SystemState {
 #define WIFI_SSID           "Wokwi-GUEST"
 #define WIFI_PASSWORD       ""
 #define WIFI_MAX_RETRIES    3
-#define WIFI_CHECK_INTERVAL 300000  // 5 minutes
-#define WIFI_RETRY_DELAY    3000    // 3 seconds
+#define WIFI_CHECK_INTERVAL  60000    // 1 minute
+#define WIFI_RETRY_DELAY    3000     // 3 seconds
 #define WIFI_BACKOFF_FACTOR   2        // For exponential backoff
 
 
@@ -47,21 +47,21 @@ enum class SystemState {
  * NTP Configuration
  ******************************************************************************/
 #define NTP_SYNC_INTERVAL   3600000  // 1 hour
-#define NTP_SYNC_TIMEOUT    10000    // 10 seconds
+#define NTP_SYNC_TIMEOUT    5000     // 5 seconds
 #define NTP_SERVER          "pool.ntp.org"
 #define NTP_BACKUP_SERVER   "time.nist.gov"
-#define NTP_RETRY_DELAY    3000
+#define NTP_RETRY_DELAY     3000     // 3 seconds
 #define NTP_BACKOFF_FACTOR   2
 
 /*******************************************************************************
  * Temperature Sensor Configuration
  ******************************************************************************/
 #define TEMP_SENSOR_PIN     14
-#define TEMP_READ_INTERVAL  5000         // 1 second
+#define TEMP_READ_INTERVAL  2000     // 2 seconds
 #define TEMP_MAX_RETRIES    3
-#define TEMP_SMOOTH_SAMPLES 1
+#define TEMP_SMOOTH_SAMPLES 5        // Rolling average over 5 samples
 #define TEMP_DEFAULT_VALUE  25.0
-#define TEMP_READ_TIMEOUT   1000         // 1 second
+#define TEMP_READ_TIMEOUT   1000     // 1 second
 
 // Temperature Control Thresholds
 #define DEFAULT_TARGET_TEMP 27.0         // Target temperature
@@ -89,10 +89,10 @@ enum class SystemState {
 
 // Control Parameters
 #define FAN_PULSES_PER_REV  2            // Pulses per revolution
-#define RPM_UPDATE_INTERVAL 3000          // Update RPM every second
+#define RPM_UPDATE_INTERVAL 1000          // Update RPM every second
 #define FAN_MIN_RUNTIME     10000         // Min runtime before speed change
 #define FAN_RAMP_STEP       5             // PWM change per step
-#define FAN_RAMP_INTERVAL   350           // Ms between PWM changes
+#define FAN_RAMP_INTERVAL   250           // Ms between PWM changes
 
 // Fan Status Codes
 #define FAN_STATUS_OK           0
@@ -127,11 +127,11 @@ enum class FanMode {
 #define MQTT_PORT              1883
 #define MQTT_CLIENT_ID         "esp32_fan_controller"
 #define MQTT_RECONNECT_DELAY   5000
-#define MQTT_UPDATE_INTERVAL   5000   // 5 seconds
+#define MQTT_UPDATE_INTERVAL   10000
 #define MQTT_MAX_RETRIES      3
 
 // Base Topic
-#define MQTT_BASE_TOPIC "fan_controller_amadeusmilitu_128932"
+#define MQTT_BASE_TOPIC "fan_controller_esp_32"
 
 // Status & Control Topics
 #define MQTT_FAN_STATE_TOPIC             MQTT_BASE_TOPIC "/status"

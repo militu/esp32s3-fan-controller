@@ -17,7 +17,8 @@ DashboardScreen::DashboardScreen()
     , mqttLabel(nullptr)
     , nightLabel(nullptr)
     , initialized(false)
-    , animationInProgress(false) {
+    , animationInProgress(false)
+    , currentArcValue(0) {
     uiMutex = xSemaphoreCreateMutex();
 
 }
@@ -138,7 +139,8 @@ void DashboardScreen::createTemperatureArc(uint16_t size, uint16_t xPos) {
     lv_arc_set_rotation(arc, 135);
     lv_arc_set_bg_angles(arc, 0, 270);
     lv_arc_set_range(arc, 0, 100);
-    
+    lv_arc_set_value(arc, 0);
+
     uint16_t arcWidth = size * 0.1;
     lv_obj_set_style_arc_width(arc, arcWidth, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_arc_width(arc, arcWidth, LV_PART_INDICATOR | LV_STATE_DEFAULT);

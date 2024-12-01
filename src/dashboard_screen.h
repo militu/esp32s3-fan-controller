@@ -111,7 +111,7 @@ private:
     static void arcAnimCallback(void* var, int32_t value);
 
     bool animationInProgress;
-    SemaphoreHandle_t uiMutex;  // Add this member variable
+    SemaphoreHandle_t uiMutex;
 
 };
 
