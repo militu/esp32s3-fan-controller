@@ -20,7 +20,7 @@ public:
      * @brief Constructor - initializes all UI elements to nullptr
      */
     DashboardScreen();  // Just declaration, no implementation here
-
+    ~DashboardScreen();
 
     /**
      * @brief Initializes display dimensions
@@ -59,6 +59,8 @@ public:
     lv_obj_t* getScreen() {
         return screen;  // Return the main screen object
     }
+
+    SemaphoreHandle_t getUIMutex() const { return uiMutex; }
 
 private:
     // display dimensions
@@ -107,6 +109,10 @@ private:
     lv_anim_t arcAnim;
     int currentArcValue;
     static void arcAnimCallback(void* var, int32_t value);
+
+    bool animationInProgress;
+    SemaphoreHandle_t uiMutex;
+
 };
 
 #endif // DASHBAORD_SCREEN_H

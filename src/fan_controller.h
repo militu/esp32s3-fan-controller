@@ -131,8 +131,9 @@ public:
 private:
     // Constants
     static constexpr uint32_t TASK_STACK_SIZE = 4096;
-    static constexpr UBaseType_t TASK_PRIORITY = 2;
+    static constexpr UBaseType_t TASK_PRIORITY = 3;
     static constexpr BaseType_t TASK_CORE = 1;
+
     static constexpr uint32_t MUTEX_TIMEOUT_MS = 1000;
     static constexpr uint8_t STALL_RETRY_COUNT = 3;
     static constexpr uint32_t EVENT_CHECK_INTERVAL = 1000;

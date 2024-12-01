@@ -131,7 +131,7 @@ void MqttManager::connect() {
 void MqttManager::processUpdate() {
     if (!initialized || !WiFi.isConnected()) {
         DEBUG_LOG("WiFi not connected or mqtt not initialized");
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(100));
         return;
     }
 

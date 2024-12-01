@@ -46,7 +46,7 @@ bool DisplayManager::begin(DisplayDriver* displayDriver) {
     lv_init();
 
     // Allocate display buffers
-    static uint32_t buf_size = driver->width() * 10;
+    static uint32_t buf_size = driver->width() * 20;
     static lv_disp_draw_buf_t draw_buf;
     static lv_color_t *buf1 = (lv_color_t *)heap_caps_malloc(
         buf_size * sizeof(lv_color_t), MALLOC_CAP_DMA);
@@ -96,6 +96,19 @@ bool DisplayManager::begin(DisplayDriver* displayDriver) {
         return false;
     }
 
+    TaskManager::TaskConfig uiUpdateConfig{
+        "UI_Updates",
+        UI_UPDATE_STACK_SIZE,
+        UI_UPDATE_TASK_PRIORITY,
+        UI_UPDATE_TASK_CORE
+    };
+    
+    err = taskManager.createTask(uiUpdateConfig, uiUpdateTask, this);
+    if (err != ESP_OK) {
+        DEBUG_LOG_DISPLAY("DisplayManager: UI task creation failed with error %d", err);
+        return false;
+    }
+
     initialized = true;
     DEBUG_LOG_DISPLAY("DisplayManager: Initialization complete");
     return true;
@@ -111,19 +124,36 @@ void DisplayManager::lvglTask(void* parameters) {
     display->processLVGL();
 }
 
+void DisplayManager::uiUpdateTask(void* parameters) {
+    DisplayManager* display = static_cast<DisplayManager*>(parameters);
+    display->processUIUpdates();
+}
+
+
 void DisplayManager::processLVGL() {
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    
+    while (true) {
+        {
+            MutexGuard guard(dashboardUI.getUIMutex(), pdMS_TO_TICKS(10));
+            if (guard.isLocked()) {
+                lv_timer_handler();
+            }
+        }
+        
+        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1));
+    }
+}
+
+void DisplayManager::processUIUpdates() {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     UICommand cmd;
     
     while (true) {
-        // Handle LVGL timer
-        lv_timer_handler();
-
         // Handle screen transition if needed
         if (needsScreenTransition) {
             DEBUG_LOG_DISPLAY("Executing screen transition to dashboard");
             dashboardUI.begin();
-            lv_scr_load(dashboardUI.getScreen());
             needsScreenTransition = false;
             DEBUG_LOG_DISPLAY("Screen transition complete");
         }
@@ -131,7 +161,6 @@ void DisplayManager::processLVGL() {
         // Process screen-specific logic
         switch (currentState) {
             case DisplayState::BOOT:
-                // Just keep the boot screen updated
                 break;
                 
             case DisplayState::DASHBOARD:
@@ -159,7 +188,7 @@ void DisplayManager::processLVGL() {
                 break;
         }
         
-        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(2));
+        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(LVGL_TASK_DELAY));
     }
 }
 

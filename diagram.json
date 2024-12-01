@@ -16,7 +16,7 @@
       "id": "esp",
       "top": -19.38,
       "left": 42.97,
-      "attrs": { "flashSize": "8", "psramSize": "8", "psramType": "octal" }
+      "attrs": { "flashSize": "16", "psramSize": "8", "psramType": "octal" }
     },
     {
       "type": "board-ds18b20",
