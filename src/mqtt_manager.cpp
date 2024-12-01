@@ -261,7 +261,7 @@ void MqttManager::mqttTask(void* parameters) {
     while (true) {
         mqtt->taskManager.updateTaskRunTime("MQTT");
         mqtt->processUpdate();
-        vTaskDelay(pdMS_TO_TICKS(100)); 
+        vTaskDelay(pdMS_TO_TICKS(1000)); 
     }
 }
 
