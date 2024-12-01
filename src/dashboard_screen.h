@@ -113,6 +113,22 @@ private:
     bool animationInProgress;
     SemaphoreHandle_t uiMutex;
 
+    struct StatusState {
+        bool wifiConnected = false;
+        bool mqttConnected = false;
+        bool nightModeEnabled = false;
+        bool nightModeActive = false;
+    };
+    StatusState lastStatus;
+
+    // Define consistent colors as constants
+    static constexpr uint32_t COLOR_SUCCESS = 0x00FF88;    // Cyan (from boot screen)
+    static constexpr uint32_t COLOR_ERROR = 0xFF5555;      // Soft red (from boot screen)
+    static constexpr uint32_t COLOR_WORKING = 0x00A5FF;    // Blue (from boot screen)
+    static constexpr uint32_t COLOR_INACTIVE = 0x404060;   // Dark blue-gray
+    static constexpr uint32_t COLOR_BORDER = 0x304060;     // Border color
+    static constexpr uint32_t COLOR_BG_DARK = 0x1A1A2A;    // Dark background
+    static constexpr uint32_t COLOR_BG_LIGHT = 0x202040;   // Lighter background for gradient
 };
 
 #endif // DASHBAORD_SCREEN_H

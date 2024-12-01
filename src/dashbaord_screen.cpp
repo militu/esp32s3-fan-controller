@@ -1,4 +1,5 @@
 #include "dashboard_screen.h"
+#include "display_colors.h"
 
 /**
  * @brief Constructor - Initializes all UI elements to nullptr
@@ -51,7 +52,7 @@ void DashboardScreen::createUI() {
     uint16_t leftContainerWidth = displayWidth * 0.1;  // 10% of width
     uint16_t arcSize = displayWidth * 0.35;
     uint16_t rightContainerWidth = displayWidth * 0.4;  // 35% of width
-    uint16_t containerHeight = arcSize;
+    uint16_t containerHeight = arcSize * 0.8;
 
     // Calculate horizontal positions
     uint16_t leftContainerX = margin;
@@ -108,7 +109,11 @@ lv_obj_t* DashboardScreen::getArc() {
 void DashboardScreen::createMainScreen() {
     screen = lv_obj_create(NULL);
     lv_obj_set_scrollbar_mode(screen, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_set_style_bg_color(screen, lv_color_black(), LV_STATE_DEFAULT);
+    
+    // Match boot screen's gradient background
+    lv_obj_set_style_bg_color(screen, lv_color_hex(0x101020), LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_grad_color(screen, lv_color_hex(0x202040), LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_grad_dir(screen, LV_GRAD_DIR_VER, LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, LV_STATE_DEFAULT);
 }
 
@@ -116,26 +121,41 @@ void DashboardScreen::createLeftContainer(uint16_t width, uint16_t height, uint1
     left_container = lv_obj_create(screen);
     
     lv_obj_set_size(left_container, width, height);
-    lv_obj_set_style_bg_color(left_container, lv_color_hex(0x101010), LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(left_container, LV_OPA_COVER, LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(left_container, lv_color_hex(DisplayColors::BG_DARK), LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(left_container, LV_OPA_50, LV_STATE_DEFAULT);
     lv_obj_set_style_pad_all(left_container, width * 0.1, LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(left_container, 1, LV_STATE_DEFAULT);
-    lv_obj_set_style_border_color(left_container, lv_color_hex(0x404040), LV_STATE_DEFAULT);
-    lv_obj_set_style_radius(left_container, 8, LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(left_container, displayWidth * 0.002, LV_STATE_DEFAULT);
+    lv_obj_set_style_border_color(left_container, lv_color_hex(DisplayColors::BORDER), LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(left_container, displayWidth * 0.015, LV_STATE_DEFAULT);
     
-    // Position from left instead of using alignment
+    // Add gradient effect
+    lv_obj_set_style_bg_grad_color(left_container, lv_color_hex(DisplayColors::BG_LIGHT), LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_grad_dir(left_container, LV_GRAD_DIR_VER, LV_STATE_DEFAULT);
+    
     lv_obj_set_pos(left_container, xPos, (displayHeight - height) / 2);
 }
 
 void DashboardScreen::createTemperatureArc(uint16_t size, uint16_t xPos) {
-    arc = lv_arc_create(screen);
-    lv_obj_set_size(arc, size, size);
-    lv_obj_set_user_data(screen, this);  // Store screen reference
-
-    // Position arc explicitly instead of centering
-    lv_obj_set_pos(arc, xPos, (displayHeight - size) / 2);
+    // Create container for arc
+    lv_obj_t* arc_container = lv_obj_create(screen);
+    lv_obj_set_size(arc_container, size * 1.1, size * 1.1);
+    lv_obj_set_style_bg_color(arc_container, lv_color_hex(DisplayColors::BG_DARK), LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(arc_container, LV_OPA_50, LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(arc_container, displayWidth * 0.002, LV_STATE_DEFAULT);
+    lv_obj_set_style_border_color(arc_container, lv_color_hex(DisplayColors::BORDER), LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(arc_container, size * 0.55, LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_all(arc_container, size * 0.05, LV_STATE_DEFAULT);
     
-    // Rest of arc configuration remains the same
+    lv_obj_set_style_bg_grad_color(arc_container, lv_color_hex(DisplayColors::BG_LIGHT), LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_grad_dir(arc_container, LV_GRAD_DIR_VER, LV_STATE_DEFAULT);
+    
+    lv_obj_set_pos(arc_container, xPos - size * 0.05, (displayHeight - size * 1.1) / 2);
+
+    arc = lv_arc_create(arc_container);
+    lv_obj_set_size(arc, size, size);
+    lv_obj_center(arc);
+    lv_obj_set_user_data(arc_container, this);
+
     lv_arc_set_rotation(arc, 135);
     lv_arc_set_bg_angles(arc, 0, 270);
     lv_arc_set_range(arc, 0, 100);
@@ -144,11 +164,12 @@ void DashboardScreen::createTemperatureArc(uint16_t size, uint16_t xPos) {
     uint16_t arcWidth = size * 0.1;
     lv_obj_set_style_arc_width(arc, arcWidth, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_arc_width(arc, arcWidth, LV_PART_INDICATOR | LV_STATE_DEFAULT);
-    lv_obj_set_style_arc_color(arc, lv_color_hex(0x202040), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_arc_color(arc, lv_color_hex(0x00FF00), LV_PART_INDICATOR | LV_STATE_DEFAULT);
+    lv_obj_set_style_arc_color(arc, lv_color_hex(DisplayColors::BORDER), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_arc_color(arc, lv_color_hex(DisplayColors::SUCCESS), LV_PART_INDICATOR | LV_STATE_DEFAULT);
 
     tempLabel = lv_label_create(arc);
     lv_obj_center(tempLabel);
+    lv_obj_set_style_text_font(tempLabel, &lv_font_montserrat_16, LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(tempLabel, lv_color_white(), LV_STATE_DEFAULT);
     lv_label_set_text(tempLabel, "0.0°C");
 }
@@ -157,39 +178,38 @@ void DashboardScreen::createRightContainer(uint16_t width, uint16_t height, uint
     lv_obj_t* right_container = lv_obj_create(screen);
     
     lv_obj_set_size(right_container, width, height);
-    lv_obj_set_style_bg_color(right_container, lv_color_hex(0x101010), LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(right_container, LV_OPA_COVER, LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(right_container, lv_color_hex(COLOR_BG_DARK), LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(right_container, LV_OPA_50, LV_STATE_DEFAULT);
     lv_obj_set_style_pad_all(right_container, width * 0.08, LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(right_container, 1, LV_STATE_DEFAULT);
-    lv_obj_set_style_border_color(right_container, lv_color_hex(0x404040), LV_STATE_DEFAULT);
-    lv_obj_set_style_radius(right_container, 8, LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(right_container, displayWidth * 0.002, LV_STATE_DEFAULT);
+    lv_obj_set_style_border_color(right_container, lv_color_hex(COLOR_BORDER), LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(right_container, displayWidth * 0.015, LV_STATE_DEFAULT);
     
-    // Position from left instead of using alignment
+    // Add gradient effect
+    lv_obj_set_style_bg_grad_color(right_container, lv_color_hex(COLOR_BG_LIGHT), LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_grad_dir(right_container, LV_GRAD_DIR_VER, LV_STATE_DEFAULT);
+    
     lv_obj_set_pos(right_container, xPos, (displayHeight - height) / 2);
 
-    // Calculate vertical spacing for labels
     uint16_t labelSpacing = height * 0.20;
     uint16_t topMargin = height * 0.10;
     
     currentSpeedLabel = createInfoLabel(right_container, LV_ALIGN_TOP_LEFT, 0, topMargin, "Current: 0%");
     targetSpeedLabel = createInfoLabel(right_container, LV_ALIGN_TOP_LEFT, 0, topMargin + labelSpacing, "Target: 0%");
     modeLabel = createInfoLabel(right_container, LV_ALIGN_TOP_LEFT, 0, topMargin + labelSpacing * 2, "Mode: Auto");
-}
-
-void DashboardScreen::createStatusIndicators() {
-    uint16_t containerHeight = lv_obj_get_height(left_container);
-    uint16_t spacing = 15;
     
-    wifiLabel = createStatusLabel(left_container, LV_ALIGN_TOP_MID, 0, spacing, LV_SYMBOL_WIFI);
-    nightLabel = createStatusLabel(left_container, LV_ALIGN_CENTER, 0, 0, "N");
-    mqttLabel = createStatusLabel(left_container, LV_ALIGN_BOTTOM_MID, 0, -spacing, "M");
+    // Update font sizes
+    lv_obj_set_style_text_font(currentSpeedLabel, &lv_font_montserrat_14, LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(targetSpeedLabel, &lv_font_montserrat_14, LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(modeLabel, &lv_font_montserrat_14, LV_STATE_DEFAULT);
 }
 
 lv_obj_t* DashboardScreen::createStatusLabel(lv_obj_t* parent, lv_align_t align, lv_coord_t x_ofs, lv_coord_t y_ofs, const char* text) {
     lv_obj_t* label = lv_label_create(parent);
     lv_obj_align(label, align, x_ofs, y_ofs);
     lv_obj_set_style_text_font(label, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(label, lv_color_white(), LV_STATE_DEFAULT);
+    // Set initial color explicitly during creation
+    lv_obj_set_style_text_color(label, lv_color_hex(COLOR_INACTIVE), LV_STATE_DEFAULT);
     lv_label_set_text(label, text);
     return label;
 }
@@ -237,9 +257,9 @@ void DashboardScreen::updateTemperatureDisplay(float temp) {
     lv_label_set_text(tempLabel, tempStr);
 
     // Update arc color based on temperature
-    lv_color_t tempColor = (temp < 30.0f) ? lv_color_hex(0x00FF00) :
-                          (temp < 40.0f) ? lv_color_hex(0xFFA500) :
-                                         lv_color_hex(0xFF0000);
+    lv_color_t tempColor = (temp < 30.0f) ? lv_color_hex(DisplayColors::TEMP_GOOD) :
+                          (temp < 40.0f) ? lv_color_hex(DisplayColors::TEMP_WARNING) :
+                                         lv_color_hex(DisplayColors::TEMP_CRITICAL);
     lv_obj_set_style_arc_color(arc, tempColor, LV_PART_INDICATOR | LV_STATE_DEFAULT);
 }
 
@@ -247,32 +267,55 @@ void DashboardScreen::arcAnimCallback(void* var, int32_t value) {
     lv_arc_set_value((lv_obj_t*)var, value);
 }
 
-void DashboardScreen::updateStatusIndicators(bool wifiConnected, bool mqttConnected, bool nightModeEnabled, bool nightModeActive) {
+void DashboardScreen::createStatusIndicators() {
+    // Calculate positions within left container
+    lv_coord_t containerHeight = lv_obj_get_height(left_container);
+    
+    // Get arc dimensions for reference
+    lv_obj_t* arc_container = lv_obj_get_parent(arc);
+    lv_coord_t arcHeight = lv_obj_get_height(arc_container);
+    
+    // Calculate spacing to match arc height
+    uint16_t spacing = arcHeight / 3;  // Divide height into three equal sections
+    uint16_t topOffset = (containerHeight - arcHeight) / 2;  // Align with arc top
+    
+    // Create and position labels
+    wifiLabel = createStatusLabel(left_container, LV_ALIGN_TOP_MID, 0, 0, LV_SYMBOL_WIFI);
+    nightLabel = createStatusLabel(left_container, LV_ALIGN_CENTER, 0, 0, "N");
+    mqttLabel = createStatusLabel(left_container, LV_ALIGN_BOTTOM_MID, 0, 0, "M");
+
+    // Force an initial update to ensure proper colors
+    updateStatusIndicators(false, false, false, false);
+}
+
+void DashboardScreen::updateStatusIndicators(bool wifiConnected, bool mqttConnected, 
+                                           bool nightModeEnabled, bool nightModeActive) {
     MutexGuard guard(uiMutex, pdMS_TO_TICKS(10));
     if (!guard.isLocked()) return;
 
     // Update WiFi status
     lv_label_set_text(wifiLabel, wifiConnected ? LV_SYMBOL_WIFI : LV_SYMBOL_CLOSE);
     lv_obj_set_style_text_color(wifiLabel, 
-        wifiConnected ? lv_color_hex(0x00FF00) : lv_color_hex(0xFF0000), 
+        wifiConnected ? lv_color_hex(DisplayColors::SUCCESS) : lv_color_hex(DisplayColors::ERROR), 
         LV_STATE_DEFAULT);
 
     // Update night mode status
-    lv_color_t nightColor;
-    if (nightModeActive) {
-        nightColor = lv_color_hex(0x00FF00);  // Green
-    } else if (nightModeEnabled) {
-        nightColor = lv_color_hex(0x8080FF);  // Light blue
-    } else {
-        nightColor = lv_color_hex(0x404040);  // Dark blue
-    }
+    lv_color_t nightColor = nightModeActive ? lv_color_hex(DisplayColors::SUCCESS) :
+                           nightModeEnabled ? lv_color_hex(DisplayColors::WORKING) :
+                                            lv_color_hex(DisplayColors::INACTIVE);
     lv_obj_set_style_text_color(nightLabel, nightColor, LV_STATE_DEFAULT);
 
     // Update MQTT status
     lv_label_set_text(mqttLabel, mqttConnected ? "M" : "×");
     lv_obj_set_style_text_color(mqttLabel,
-        mqttConnected ? lv_color_hex(0x00FF00) : lv_color_hex(0xFF0000),
+        mqttConnected ? lv_color_hex(DisplayColors::SUCCESS) : lv_color_hex(DisplayColors::ERROR),
         LV_STATE_DEFAULT);
+
+    // Update last status directly
+    lastStatus.wifiConnected = wifiConnected;
+    lastStatus.mqttConnected = mqttConnected;
+    lastStatus.nightModeEnabled = nightModeEnabled;
+    lastStatus.nightModeActive = nightModeActive;
 }
 
 void DashboardScreen::updateSpeedDisplay(int fanSpeed, int targetSpeed) {

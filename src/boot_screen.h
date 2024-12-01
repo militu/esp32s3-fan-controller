@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include "lvgl.h"
+#include "mutex_guard.h"
 
 /**
  * @brief Manages the boot screen UI displayed during system initialization
@@ -20,9 +21,10 @@ public:
     };
 
     /**
-     * @brief Constructor - initializes UI elements
+     * @brief Constructor /Destructor - initializes UI elements
      */
     BootScreen();
+    ~BootScreen();
 
     /**
      * @brief Initialize display dimensions
@@ -71,12 +73,18 @@ private:
     // UI Creation Methods
     void createUI();
     void createMainScreen();
-    lv_obj_t* createStatusLabel(const char* text, lv_coord_t yOffset);
-    lv_obj_t* createDetailLabel(const char* text, lv_coord_t yOffset);
-    
+    lv_color_t getStatusBgColor(ComponentStatus status);
+    void createStatusSection(const char* title, uint16_t yOffset, 
+                               lv_obj_t** statusLabel, lv_obj_t** detailLabel);
+    const lv_font_t* selectDynamicFont(uint16_t width);
+    const lv_font_t* selectDetailFont(uint16_t width);
+
     // Helper Methods
     const char* getStatusText(ComponentStatus status);
     lv_color_t getStatusColor(ComponentStatus status);
+
+    SemaphoreHandle_t uiMutex;
+    void animateContainer(lv_obj_t* container, ComponentStatus status);
 };
 
 #endif // BOOT_SCREEN_H

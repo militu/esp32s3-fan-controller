@@ -91,13 +91,6 @@ private:
         return true;
     }
 
-    bool initializeNetworkComponents() {
-        if (!initializeWifi()) return false;
-        if (!initializeNTP()) return false;
-        if (!initializeMQTT()) return false;
-        return true;
-    }
-
     bool initializeOperationalComponents() {
         // Register component relationships
         tempSensor.registerFanController(&fanController);
