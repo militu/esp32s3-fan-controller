@@ -203,20 +203,35 @@ void BootScreen::updateStatusWithDetail(const char* component, ComponentStatus s
 }
 
 void BootScreen::animateContainer(lv_obj_t* container, ComponentStatus status) {
-    // Set background color based on status
+    // Set background color based on status - using darker versions of palette colors
     lv_color_t bgColor;
     switch (status) {
         case ComponentStatus::WORKING:
-            bgColor = lv_color_hex(0x1A2A3A);  // Slightly blue
+            // Darker version of WORKING color
+            bgColor = lv_color_mix(
+                lv_color_hex(DisplayColors::BG_DARK),
+                lv_color_hex(DisplayColors::WORKING),
+                64  // Mix ratio - smaller number = darker
+            );
             break;
         case ComponentStatus::SUCCESS:
-            bgColor = lv_color_hex(0x1A2A1A);  // Slightly green
+            // Darker version of SUCCESS color
+            bgColor = lv_color_mix(
+                lv_color_hex(DisplayColors::BG_DARK),
+                lv_color_hex(DisplayColors::SUCCESS),
+                64
+            );
             break;
         case ComponentStatus::FAILED:
-            bgColor = lv_color_hex(0x2A1A1A);  // Slightly red
+            // Darker version of ERROR color
+            bgColor = lv_color_mix(
+                lv_color_hex(DisplayColors::BG_DARK),
+                lv_color_hex(DisplayColors::ERROR),
+                64
+            );
             break;
         default:
-            bgColor = lv_color_hex(0x1A1A2A);  // Default dark
+            bgColor = lv_color_hex(DisplayColors::BG_DARK);
     }
     lv_obj_set_style_bg_color(container, bgColor, LV_STATE_DEFAULT);
 

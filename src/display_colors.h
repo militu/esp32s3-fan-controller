@@ -3,24 +3,25 @@
 
 namespace DisplayColors {
     // Status Colors
-    static constexpr uint32_t SUCCESS = 0x00FF88;     // Cyan
-    static constexpr uint32_t ERROR = 0xFF5555;       // Soft red
-    static constexpr uint32_t WORKING = 0x00A5FF;     // Blue
-    static constexpr uint32_t INACTIVE = 0x404060;    // Dark blue-gray
+    static constexpr uint32_t SUCCESS = 0x4ADE80;     // Soft mint green - more modern than cyan
+    static constexpr uint32_t ERROR = 0xFF4444;       // Vibrant coral red - clear but not harsh
+    static constexpr uint32_t WORKING = 0x60A5FA;     // Modern blue - softer and more professional
+    static constexpr uint32_t INACTIVE = 0x334155;    // Slate gray - more neutral and sophisticated
     
     // UI Elements
-    static constexpr uint32_t BORDER = 0x304060;      // Border color
-    static constexpr uint32_t TEXT_PRIMARY = 0xFFFFFF; // White
-    static constexpr uint32_t TEXT_SECONDARY = 0x808080; // Gray
+    static constexpr uint32_t BORDER = 0x475569;      // Medium slate - subtle but visible
+    static constexpr uint32_t TEXT_PRIMARY = 0xF8FAFC; // Off-white - easier on the eyes
+    static constexpr uint32_t TEXT_SECONDARY = 0x94A3B8; // Cool gray - better contrast
     
     // Background Colors
-    static constexpr uint32_t BG_DARK = 0x101020;     // Darker background
-    static constexpr uint32_t BG_LIGHT = 0x202040;    // Lighter background
+    static constexpr uint32_t BG_DARK = 0x0F172A;     // Deep navy - rich background
+    static constexpr uint32_t BG_LIGHT = 0x1E293B;    // Lighter navy - subtle gradient
     
     // Temperature Colors
-    static constexpr uint32_t TEMP_GOOD = 0x00FF00;   // Green
-    static constexpr uint32_t TEMP_WARNING = 0xFFA500; // Orange
-    static constexpr uint32_t TEMP_CRITICAL = 0xFF0000; // Red
+    static constexpr uint32_t TEMP_GOOD = 0x34D399;   // Emerald green - professional
+    static constexpr uint32_t TEMP_WARNING = 0xFBAF24; // Warm amber - clear warning
+    static constexpr uint32_t TEMP_CRITICAL = 0xEF4444; // New red - serious but not harsh
+    static constexpr uint32_t KNOB = 0x334155;        // Matching slate for consistency
 }
 
 #endif // DISPLAY_COLORS_H
