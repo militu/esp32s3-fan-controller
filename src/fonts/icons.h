@@ -1,5 +1,5 @@
-#ifndef FA_MOON_H
-#define FA_MOON_H
+#ifndef ICONS_H
+#define ICONS_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -7,11 +7,12 @@ extern "C" {
 
 #include "lvgl.h"
 
-// Declare the font
+// Declare the fonts
 LV_FONT_DECLARE(fa_moon);
+LV_FONT_DECLARE(fa_tower_broadcast);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // FA_MOON_H
+#endif // ICONS_H

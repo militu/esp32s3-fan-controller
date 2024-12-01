@@ -3,23 +3,21 @@
  * @brief Implementation of the TempSensor class
  */
 
-#define DEBUG_LOG_TEMP(msg, ...) if (DEBUG_TEMP) { Serial.printf(msg "\n", ##__VA_ARGS__); }
-
 #include "temp_sensor.h"
 #include "fan_controller.h"
 
-//------------------------------------------------------------------------------
-// Constructor & Destructor
-//------------------------------------------------------------------------------
+/*******************************************************************************
+ * Construction / Destruction
+ ******************************************************************************/
 
 TempSensor::TempSensor(TaskManager& tm)
     : taskManager(tm)
     , fanController(nullptr)
-    , oneWire(TEMP_SENSOR_PIN)
+    , oneWire(Config::Temperature::SENSOR_PIN)
     , sensors(&oneWire)
     , mutex(xSemaphoreCreateMutex())
-    , currentTemp(TEMP_DEFAULT_VALUE)
-    , smoothedTemp(TEMP_DEFAULT_VALUE)
+    , currentTemp(Config::Temperature::DEFAULT_VALUE)
+    , smoothedTemp(Config::Temperature::DEFAULT_VALUE)
     , historyIndex(0)
     , lastReadSuccess(false)
     , lastReadTime(0)
@@ -31,8 +29,8 @@ TempSensor::TempSensor(TaskManager& tm)
     }
     
     // Initialize temperature history buffer
-    for (int i = 0; i < TEMP_SMOOTH_SAMPLES; i++) {
-        tempHistory[i] = TEMP_DEFAULT_VALUE;
+    for (int i = 0; i < Config::Temperature::SMOOTH_SAMPLES; i++) {
+        tempHistory[i] = Config::Temperature::DEFAULT_VALUE;
     }
 }
 
@@ -42,9 +40,9 @@ TempSensor::~TempSensor() {
     }
 }
 
-//------------------------------------------------------------------------------
-// Initialization
-//------------------------------------------------------------------------------
+/*******************************************************************************
+ * Initialization
+ ******************************************************************************/
 
 esp_err_t TempSensor::begin() {
     DEBUG_LOG_TEMP("Temperature Sensor Starting...");
@@ -93,9 +91,9 @@ void TempSensor::registerFanController(FanController* controller) {
     }
 }
 
-//------------------------------------------------------------------------------
-// Temperature Reading and Processing
-//------------------------------------------------------------------------------
+/*******************************************************************************
+ * Temperature Reading and Processing
+ ******************************************************************************/
 
 void TempSensor::processReading() {
     if (!initialized) return;
@@ -137,8 +135,8 @@ void TempSensor::processReading() {
     } else {
         consecutiveFailures++;
         lastReadSuccess = false;
-        if (consecutiveFailures >= TEMP_MAX_RETRIES) {
-            currentTemp = TEMP_DEFAULT_VALUE;
+        if (consecutiveFailures >= Config::Temperature::MAX_RETRIES) {
+            currentTemp = Config::Temperature::DEFAULT_VALUE;
         }
     }
 
@@ -154,45 +152,6 @@ void TempSensor::processReading() {
         }
     }
 }
-
-//------------------------------------------------------------------------------
-// Thread-safe Getters
-//------------------------------------------------------------------------------
-
-float TempSensor::getCurrentTemp() const {
-    MutexGuard guard(mutex);
-    if (!guard.isLocked()) return TEMP_DEFAULT_VALUE;
-    return currentTemp;
-}
-
-float TempSensor::getSmoothedTemp() const {
-    MutexGuard guard(mutex);
-    if (!guard.isLocked()) return TEMP_DEFAULT_VALUE;
-    return smoothedTemp;
-}
-
-bool TempSensor::isLastReadSuccess() const {
-    MutexGuard guard(mutex);
-    if (!guard.isLocked()) return false;
-    return lastReadSuccess;
-}
-
-String TempSensor::getStatusString() const {
-    MutexGuard guard(mutex);
-    if (!guard.isLocked()) return "Mutex Error";
-    
-    if (lastReadSuccess) {
-        return "OK";
-    } else if (consecutiveFailures >= TEMP_MAX_RETRIES) {
-        return "Failed - Using Default";
-    } else {
-        return "Retrying";
-    }
-}
-
-//------------------------------------------------------------------------------
-// Private Helper Methods
-//------------------------------------------------------------------------------
 
 bool TempSensor::startConversion() {
     MutexGuard guard(mutex);
@@ -221,8 +180,8 @@ bool TempSensor::readTemperature() {
         consecutiveFailures++;
         lastReadSuccess = false;
         
-        if (consecutiveFailures >= TEMP_MAX_RETRIES) {
-            currentTemp = TEMP_DEFAULT_VALUE;
+        if (consecutiveFailures >= Config::Temperature::MAX_RETRIES) {
+            currentTemp = Config::Temperature::DEFAULT_VALUE;
         }
     }
 
@@ -232,18 +191,53 @@ bool TempSensor::readTemperature() {
 
 void TempSensor::updateSmoothing(float newTemp) {
     tempHistory[historyIndex] = newTemp;
-    historyIndex = (historyIndex + 1) % TEMP_SMOOTH_SAMPLES;
+    historyIndex = (historyIndex + 1) % Config::Temperature::SMOOTH_SAMPLES;
     
     float sum = 0;
-    for (int i = 0; i < TEMP_SMOOTH_SAMPLES; i++) {
+    for (int i = 0; i < Config::Temperature::SMOOTH_SAMPLES; i++) {
         sum += tempHistory[i];
     }
-    smoothedTemp = sum / TEMP_SMOOTH_SAMPLES;
+    smoothedTemp = sum / Config::Temperature::SMOOTH_SAMPLES;
 }
 
-//------------------------------------------------------------------------------
-// Task Implementation
-//------------------------------------------------------------------------------
+/*******************************************************************************
+ * Thread-safe Getters
+ ******************************************************************************/
+
+float TempSensor::getCurrentTemp() const {
+    MutexGuard guard(mutex);
+    if (!guard.isLocked()) return Config::Temperature::DEFAULT_VALUE;
+    return currentTemp;
+}
+
+float TempSensor::getSmoothedTemp() const {
+    MutexGuard guard(mutex);
+    if (!guard.isLocked()) return Config::Temperature::DEFAULT_VALUE;
+    return smoothedTemp;
+}
+
+bool TempSensor::isLastReadSuccess() const {
+    MutexGuard guard(mutex);
+    if (!guard.isLocked()) return false;
+    return lastReadSuccess;
+}
+
+String TempSensor::getStatusString() const {
+    MutexGuard guard(mutex);
+    if (!guard.isLocked()) return "Mutex Error";
+    
+    if (lastReadSuccess) {
+        return "OK";
+    } else if (consecutiveFailures >= Config::Temperature::MAX_RETRIES) {
+        return "Failed - Using Default";
+    } else {
+        return "Retrying";
+    }
+}
+
+/*******************************************************************************
+ * Task Implementation
+ ******************************************************************************/
 
 void TempSensor::tempTask(void* parameters) {
     TempSensor* temp = static_cast<TempSensor*>(parameters);
@@ -268,7 +262,7 @@ void TempSensor::tempTask(void* parameters) {
                 temp->processReading();
                 conversionInProgress = false;
                 // Wait remainder of the interval
-                vTaskDelay(pdMS_TO_TICKS(TEMP_READ_INTERVAL - 800));
+                vTaskDelay(pdMS_TO_TICKS(Config::Temperature::READ_INTERVAL - 800));
                 continue;
             }
         }

@@ -7,6 +7,12 @@
 
 /**
  * @brief Manages the boot screen UI displayed during system initialization
+ * 
+ * Features:
+ * - Visual initialization status display
+ * - Animated component status updates
+ * - Thread-safe UI updates
+ * - Component-specific status sections
  */
 class BootScreen {
 public:
@@ -20,9 +26,7 @@ public:
         FAILED      ///< Failed to initialize
     };
 
-    /**
-     * @brief Constructor /Destructor - initializes UI elements
-     */
+    // Construction / Destruction
     BootScreen();
     ~BootScreen();
 
@@ -34,24 +38,13 @@ public:
         displayHeight = height;
     }
 
-    /**
-     * @brief Creates and shows the boot screen
-     */
+    // Core functionality
     void begin();
-
-    /**
-     * @brief Update component status
-     */
     void updateStatus(const char* component, ComponentStatus status);
-
-    /**
-     * @brief Update component status with additional detail text
-     */
     void updateStatusWithDetail(const char* component, ComponentStatus status, const char* detail);
 
-    lv_obj_t* getScreen() {
-        return screen;  // Return the main screen object
-    }
+    // Screen access
+    lv_obj_t* getScreen() { return screen; }
 
 private:
     // Display dimensions
@@ -68,23 +61,23 @@ private:
     lv_obj_t* mqttLabel;           ///< MQTT status
     lv_obj_t* mqttDetailLabel;     ///< MQTT detail text
     
-    bool initialized;              ///< Tracks whether UI has been initialized
+    bool initialized;              ///< Tracks UI initialization
 
     // UI Creation Methods
     void createUI();
     void createMainScreen();
-    lv_color_t getStatusBgColor(ComponentStatus status);
     void createStatusSection(const char* title, uint16_t yOffset, 
-                               lv_obj_t** statusLabel, lv_obj_t** detailLabel);
+                           lv_obj_t** statusLabel, lv_obj_t** detailLabel);
     const lv_font_t* selectDynamicFont(uint16_t width);
     const lv_font_t* selectDetailFont(uint16_t width);
 
     // Helper Methods
-    const char* getStatusText(ComponentStatus status);
     lv_color_t getStatusColor(ComponentStatus status);
-
-    SemaphoreHandle_t uiMutex;
+    const char* getStatusText(ComponentStatus status);
     void animateContainer(lv_obj_t* container, ComponentStatus status);
+
+    // Synchronization
+    SemaphoreHandle_t uiMutex;
 };
 
 #endif // BOOT_SCREEN_H

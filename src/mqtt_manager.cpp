@@ -1,24 +1,11 @@
 // mqtt_manager.cpp
-#define DEBUG_LOG(msg, ...) if (DEBUG_MQTT) { Serial.printf(msg "\n", ##__VA_ARGS__); }
+#define DEBUG_LOG(msg, ...) if (Config::System::Debug::MQTT) { Serial.printf(msg "\n", ##__VA_ARGS__); }
 
 #include "mqtt_manager.h"
 
-bool testConnection(const IPAddress& host, uint16_t port, int timeout_ms = 5000) {
-    DEBUG_LOG("Testing connection to %s:%d", host.toString().c_str(), port);
-    
-    WiFiClient client;
-    client.setTimeout(timeout_ms / 1000);
-    
-    unsigned long start = millis();
-    bool connected = client.connect(host, port);
-    unsigned long duration = millis() - start;
-    
-    DEBUG_LOG("Connection test took %lu ms, result: %s", 
-              duration, connected ? "success" : "failed");
-              
-    client.stop();
-    return connected;
-}
+/*******************************************************************************
+ * Construction / Destruction
+ ******************************************************************************/
 
 MqttManager* MqttManager::instance = nullptr;
 
@@ -57,6 +44,10 @@ MqttManager::~MqttManager() {
     if (messageQueue) vQueueDelete(messageQueue);
 }
 
+/*******************************************************************************
+ * Core Initialization
+ ******************************************************************************/
+
 esp_err_t MqttManager::begin() {
     DEBUG_LOG("MQTT Manager Starting...");
 
@@ -71,7 +62,7 @@ esp_err_t MqttManager::begin() {
         return ESP_ERR_TIMEOUT;
     }
 
-    mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
+    mqttClient.setServer(Config::MQTT::SERVER, Config::MQTT::PORT);
     mqttClient.setCallback(messageCallback);
     mqttClient.setSocketTimeout(30);  // 30 seconds timeout
     mqttClient.setBufferSize(1024);   // Increase buffer size
@@ -93,6 +84,10 @@ esp_err_t MqttManager::begin() {
     return ESP_OK;
 }
 
+/*******************************************************************************
+ * Connection Management
+ ******************************************************************************/
+
 void MqttManager::connect() {
     DEBUG_LOG("Entering connect method");
     
@@ -102,7 +97,7 @@ void MqttManager::connect() {
         return;
     }
 
-    if (connectionAttempts >= MQTT_MAX_RETRIES) {
+    if (connectionAttempts >= Config::MQTT::MAX_RETRIES) {
         DEBUG_LOG("Max retries reached, resetting");
         connectionAttempts = 0;
     }
@@ -110,12 +105,12 @@ void MqttManager::connect() {
     connecting = true;
     connectionAttempts++;  // Increment before attempt
     
-    DEBUG_LOG("Starting connection attempt %d/%d", connectionAttempts, MQTT_MAX_RETRIES);
+    DEBUG_LOG("Starting connection attempt %d/%d", connectionAttempts, Config::MQTT::MAX_RETRIES);
     
-    String clientId = MQTT_CLIENT_ID;
+    String clientId = Config::MQTT::CLIENT_ID;
     if (mqttClient.connect(clientId.c_str())) {
         DEBUG_LOG("MQTT Connected Successfully!");
-        mqttClient.publish(MQTT_AVAILABILITY_TOPIC, "online", true);
+        mqttClient.publish(Config::MQTT::Topics::AVAILABILITY, "online", true);
         
         if (setupSubscriptions()) {
             DEBUG_LOG("Topics Subscribed Successfully");
@@ -145,7 +140,7 @@ void MqttManager::processUpdate() {
 
     // Check connection state and attempt reconnection if needed
     if (!mqttClient.connected() && !connecting) {
-        if (now - lastConnectAttempt >= MQTT_RECONNECT_DELAY) {
+        if (now - lastConnectAttempt >= Config::MQTT::RECONNECT_DELAY) {
             DEBUG_LOG("Attempting MQTT reconnection");
             lastConnectAttempt = now;
             connect();
@@ -157,31 +152,16 @@ void MqttManager::processUpdate() {
         // Publish availability status periodically
         if (now - lastAvailabilityPublish >= AVAILABILITY_INTERVAL) {
             lastAvailabilityPublish = now;
-            mqttClient.publish(MQTT_AVAILABILITY_TOPIC, "online", true);
+            mqttClient.publish(Config::MQTT::Topics::AVAILABILITY, "online", true);
             DEBUG_LOG("Published availability status");
         }
 
         // Process queued messages and publish status
         processQueuedMessages();
-        if (now - lastStatusUpdate >= MQTT_UPDATE_INTERVAL) {
+        if (now - lastStatusUpdate >= Config::MQTT::UPDATE_INTERVAL) {
             lastStatusUpdate = now;
             publishStatus();
         }
-    }
-}
-
-void MqttManager::publishString(const char* topic, const String& value) {
-    MutexGuard guard(messageMutex);
-    if (!guard.isLocked()) {
-        DEBUG_LOG("Failed to acquire mutex for publishing");
-        return;
-    }
-
-    if (mqttClient.connected()) {
-        bool published = mqttClient.publish(topic, value.c_str());
-        DEBUG_LOG("Published to %s: %s (success: %d)", topic, value.c_str(), published);
-    } else {
-        DEBUG_LOG("Failed to publish - not connected");
     }
 }
 
@@ -193,15 +173,39 @@ bool MqttManager::setupSubscriptions() {
     }
 
     bool success = true;
-    success &= mqttClient.subscribe(MQTT_FAN_COMMAND_TOPIC);
-    success &= mqttClient.subscribe(MQTT_FAN_PRESET_COMMAND_TOPIC);
-    success &= mqttClient.subscribe(MQTT_NIGHT_MODE_COMMAND_TOPIC);
-    success &= mqttClient.subscribe(MQTT_NIGHT_SETTINGS_COMMAND_TOPIC);
-    success &= mqttClient.subscribe(MQTT_RECOVERY_TOPIC);
+    success &= mqttClient.subscribe(Config::MQTT::Topics::COMMAND);
+    success &= mqttClient.subscribe(Config::MQTT::Topics::NIGHT_MODE);
+    success &= mqttClient.subscribe(Config::MQTT::Topics::NIGHT_SETTINGS);
+    success &= mqttClient.subscribe(Config::MQTT::Topics::STATE);
+    success &= mqttClient.subscribe(Config::MQTT::Topics::RECOVERY);
     
     DEBUG_LOG("Subscriptions setup %s", success ? "successful" : "failed");
     return success;
 }
+
+bool MqttManager::isConnected() {
+    MutexGuard guard(connectionMutex);
+    if (!guard.isLocked()) return false;
+    return mqttClient.connected();
+}
+
+void MqttManager::debugMutexState() {
+    if (!connectionMutex) {
+        DEBUG_LOG("Connection mutex is NULL!");
+        return;
+    }
+    
+    if (xSemaphoreTake(connectionMutex, pdMS_TO_TICKS(1)) == pdTRUE) {
+        DEBUG_LOG("Connection mutex is available");
+        xSemaphoreGive(connectionMutex);
+    } else {
+        DEBUG_LOG("Connection mutex is locked!");
+    }
+}
+
+/*******************************************************************************
+ * Message Processing
+ ******************************************************************************/
 
 void MqttManager::messageCallback(char* topic, byte* payload, unsigned int length) {
     if (!instance) {
@@ -223,10 +227,10 @@ bool MqttManager::enqueueMessage(const char* topic, const byte* payload, unsigne
     }
 
     MQTTMessage msg;
-    strncpy(msg.topic, topic, MAX_TOPIC_LENGTH - 1);
-    msg.topic[MAX_TOPIC_LENGTH - 1] = '\0';
+    strncpy(msg.topic, topic, MQTTMessage::MAX_TOPIC_LENGTH - 1);
+    msg.topic[MQTTMessage::MAX_TOPIC_LENGTH - 1] = '\0';
     
-    size_t copyLength = min(length, (unsigned int)(MAX_PAYLOAD_LENGTH - 1));
+    size_t copyLength = min(length, (unsigned int)(MQTTMessage::MAX_PAYLOAD_LENGTH - 1));
     memcpy(msg.payload, payload, copyLength);
     msg.payload[copyLength] = '\0';
     msg.payloadLength = copyLength;
@@ -254,60 +258,8 @@ void MqttManager::processQueuedMessages() {
     }
 }
 
-void MqttManager::mqttTask(void* parameters) {
-    MqttManager* mqtt = static_cast<MqttManager*>(parameters);
-    DEBUG_LOG("MQTT Task started");
-    
-    while (true) {
-        mqtt->taskManager.updateTaskRunTime("MQTT");
-        mqtt->processUpdate();
-        vTaskDelay(pdMS_TO_TICKS(1000)); 
-    }
-}
-
-
-String MqttManager::getMQTTStateString(int state) {
-    switch (state) {
-        case -4: return "MQTT_CONNECTION_TIMEOUT";
-        case -3: return "MQTT_CONNECTION_LOST";
-        case -2: return "MQTT_CONNECT_FAILED";
-        case -1: return "MQTT_DISCONNECTED";
-        case 0: return "MQTT_CONNECTED";
-        case 1: return "MQTT_CONNECT_BAD_PROTOCOL";
-        case 2: return "MQTT_CONNECT_BAD_CLIENT_ID";
-        case 3: return "MQTT_CONNECT_UNAVAILABLE";
-        case 4: return "MQTT_CONNECT_BAD_CREDENTIALS";
-        case 5: return "MQTT_CONNECT_UNAUTHORIZED";
-        default: return "UNKNOWN";
-    }
-}
-
-bool MqttManager::isConnected() {
-    MutexGuard guard(connectionMutex);
-    if (!guard.isLocked()) return false;
-    return mqttClient.connected();
-}
-
-void MqttManager::debugMutexState() {
-    if (!connectionMutex) {
-        DEBUG_LOG("Connection mutex is NULL!");
-        return;
-    }
-    
-    if (xSemaphoreTake(connectionMutex, pdMS_TO_TICKS(1)) == pdTRUE) {
-        DEBUG_LOG("Connection mutex is available");
-        xSemaphoreGive(connectionMutex);
-    } else {
-        DEBUG_LOG("Connection mutex is locked!");
-    }
-}
-
-// =============================================================================
-// Message Processing
-// =============================================================================
-
 void MqttManager::handleMessage(const char* topic, const byte* payload, unsigned int length) {
-    if (!topic || !payload || length == 0 || length >= MAX_PAYLOAD_LENGTH) {
+    if (!topic || !payload || length == 0 || length >= MQTTMessage::MAX_PAYLOAD_LENGTH) {
         DEBUG_LOG("Invalid message parameters");
         return;
     }
@@ -343,16 +295,16 @@ void MqttManager::handleMessage(const char* topic, const byte* payload, unsigned
             return;
         }
 
-        if (strcmp(topic, MQTT_FAN_COMMAND_TOPIC) == 0) {
+        if (strcmp(topic, Config::MQTT::Topics::COMMAND) == 0) {
             handleModeMessage(doc);
         }
-        else if (strcmp(topic, MQTT_NIGHT_MODE_COMMAND_TOPIC) == 0) {
+        else if (strcmp(topic, Config::MQTT::Topics::NIGHT_MODE) == 0) {
             handleNightModeMessage(doc);
         }
-        else if (strcmp(topic, MQTT_RECOVERY_TOPIC) == 0) {
+        else if (strcmp(topic, Config::MQTT::Topics::RECOVERY) == 0) {
             handleRecoveryMessage(doc);
         }
-        else if (strcmp(topic, MQTT_NIGHT_SETTINGS_COMMAND_TOPIC) == 0) {
+        else if (strcmp(topic, Config::MQTT::Topics::NIGHT_SETTINGS) == 0) {
             handleNightSettingsMessage(doc);
         }
     }
@@ -361,7 +313,6 @@ void MqttManager::handleMessage(const char* topic, const byte* payload, unsigned
     publishStatus();
 }
 
-// Message handlers for specific topics
 void MqttManager::handleNightModeMessage(const JsonDocument& doc) {
     DEBUG_LOG("Processing night mode message: %s", doc.as<String>().c_str());
 
@@ -452,9 +403,24 @@ void MqttManager::handleNightSettingsMessage(const JsonDocument& doc) {
               startHour, endHour, maxPercent, result ? "success" : "failed");
 }
 
-// =============================================================================
-// Status Publishing
-// =============================================================================
+/*******************************************************************************
+ * Status Publishing
+ ******************************************************************************/
+
+void MqttManager::publishString(const char* topic, const String& value) {
+    MutexGuard guard(messageMutex);
+    if (!guard.isLocked()) {
+        DEBUG_LOG("Failed to acquire mutex for publishing");
+        return;
+    }
+
+    if (mqttClient.connected()) {
+        bool published = mqttClient.publish(topic, value.c_str());
+        DEBUG_LOG("Published to %s: %s (success: %d)", topic, value.c_str(), published);
+    } else {
+        DEBUG_LOG("Failed to publish - not connected");
+    }
+}
 
 void MqttManager::publishStatus() {
     MutexGuard guard(messageMutex);
@@ -484,7 +450,7 @@ void MqttManager::publishStatus() {
     size_t n = serializeJson(doc, buffer);
     
     if (mqttClient.connected()) {
-        bool success = mqttClient.publish(MQTT_FAN_STATE_TOPIC, buffer, true);
+        bool success = mqttClient.publish(Config::MQTT::Topics::COMMAND, buffer, true);
         DEBUG_LOG("Status published (success: %d): %s", success, buffer);
     } else {
         DEBUG_LOG("Cannot publish status - not connected");
@@ -498,5 +464,56 @@ void MqttManager::publishJson(const char* topic, const JsonDocument& doc) {
     if (mqttClient.connected()) {
         bool success = mqttClient.publish(topic, buffer);
         DEBUG_LOG("Published to %s (success: %d): %s", topic, success, buffer);
+    }
+}
+
+/*******************************************************************************
+ * Task Implementation
+ ******************************************************************************/
+
+void MqttManager::mqttTask(void* parameters) {
+    MqttManager* mqtt = static_cast<MqttManager*>(parameters);
+    DEBUG_LOG("MQTT Task started");
+    
+    while (true) {
+        mqtt->taskManager.updateTaskRunTime("MQTT");
+        mqtt->processUpdate();
+        vTaskDelay(pdMS_TO_TICKS(1000)); 
+    }
+}
+
+/*******************************************************************************
+ * Utility Methods
+ ******************************************************************************/
+bool testConnection(const IPAddress& host, uint16_t port, int timeout_ms = 5000) {
+    DEBUG_LOG("Testing connection to %s:%d", host.toString().c_str(), port);
+    
+    WiFiClient client;
+    client.setTimeout(timeout_ms / 1000);
+    
+    unsigned long start = millis();
+    bool connected = client.connect(host, port);
+    unsigned long duration = millis() - start;
+    
+    DEBUG_LOG("Connection test took %lu ms, result: %s", 
+              duration, connected ? "success" : "failed");
+              
+    client.stop();
+    return connected;
+}
+
+String MqttManager::getMQTTStateString(int state) {
+    switch (state) {
+        case -4: return "MQTT_CONNECTION_TIMEOUT";
+        case -3: return "MQTT_CONNECTION_LOST";
+        case -2: return "MQTT_CONNECT_FAILED";
+        case -1: return "MQTT_DISCONNECTED";
+        case 0: return "MQTT_CONNECTED";
+        case 1: return "MQTT_CONNECT_BAD_PROTOCOL";
+        case 2: return "MQTT_CONNECT_BAD_CLIENT_ID";
+        case 3: return "MQTT_CONNECT_UNAVAILABLE";
+        case 4: return "MQTT_CONNECT_BAD_CREDENTIALS";
+        case 5: return "MQTT_CONNECT_UNAUTHORIZED";
+        default: return "UNKNOWN";
     }
 }

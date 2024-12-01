@@ -47,7 +47,7 @@ void DashboardScreen::createUI() {
     
     // Calculate base dimensions and spacing
     uint16_t margin = displayWidth * 0.04;
-    uint16_t topBarHeight = displayHeight * 0.12;
+    uint16_t topBarHeight = displayHeight * 0.20;
     uint16_t delimiterHeight = displayHeight * 0.002;
     
     // Create top status bar
@@ -66,63 +66,74 @@ void DashboardScreen::createUI() {
     lv_scr_load(screen);
 }
 
-void DashboardScreen::createDelimiter(uint16_t topOffset, uint16_t height) {
-    lv_obj_t* delimiter = lv_obj_create(screen);
-    lv_obj_set_size(delimiter, displayWidth * 0.8, height);
-    lv_obj_align(delimiter, LV_ALIGN_TOP_MID, 0, topOffset);
-    
-    // Use working color from palette for delimiter
-    lv_obj_set_style_bg_color(delimiter, lv_color_hex(DisplayColors::WORKING), LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(delimiter, LV_OPA_40, LV_STATE_DEFAULT);
-    lv_obj_set_style_radius(delimiter, height / 2, LV_STATE_DEFAULT);
-}
-
 void DashboardScreen::createTopStatusBar(uint16_t height) {
     // Create container for status indicators
     lv_obj_t* topBar = lv_obj_create(screen);
     lv_obj_set_size(topBar, displayWidth, height);
     lv_obj_set_pos(topBar, 0, 0);
+    
+    // Make container fully transparent
     lv_obj_set_style_bg_opa(topBar, LV_OPA_0, LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(topBar, 0, LV_STATE_DEFAULT);
     
-    // Calculate margins
-    uint16_t sideMargin = displayWidth * 0.05;
-    uint16_t iconSpacing = displayWidth * 0.03;
-    
-    // Create left-side status indicators (WiFi and MQTT)
+    // Calculate margins and spacing
+    uint16_t sideMargin = displayWidth * 0.02;
+    uint16_t iconSpacing = displayWidth * 0.15;
+
+    // Create status indicators with larger font
+    const lv_font_t* iconFont = &lv_font_montserrat_24;
+
+    // Left side status indicators
     wifiLabel = createStatusLabel(topBar, LV_ALIGN_LEFT_MID, sideMargin, 0, LV_SYMBOL_WIFI);
-    mqttLabel = createStatusLabel(topBar, LV_ALIGN_LEFT_MID, sideMargin + iconSpacing * 3, 0, "M");
+    mqttLabel = createStatusLabel(topBar, LV_ALIGN_LEFT_MID, sideMargin + iconSpacing, 0, MY_TOWER_BROADCAST);
     
-    // Create night mode indicator on the right (using moon symbol)
+    // Right side indicator
     nightLabel = createStatusLabel(topBar, LV_ALIGN_RIGHT_MID, -sideMargin, 0, MY_MOON_SYMBOL);
 
-    // Very important: Set the font for this label
-    lv_obj_set_style_text_font(nightLabel, &fa_moon, LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(nightLabel, lv_color_hex(DisplayColors::TEXT_PRIMARY), LV_STATE_DEFAULT);
-
-    // Set icon sizes and style
-    const lv_font_t* iconFont = (displayHeight > 240) ? &lv_font_montserrat_24 : &lv_font_montserrat_20;
+    // Set fonts
     lv_obj_set_style_text_font(wifiLabel, iconFont, LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(mqttLabel, iconFont, LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(mqttLabel, &fa_tower_broadcast, LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(nightLabel, &fa_moon, LV_STATE_DEFAULT);
+}
+
+void DashboardScreen::createDelimiter(uint16_t topOffset, uint16_t height) {
+    // Calculate margins and dimensions
+    uint16_t marginX = displayWidth * 0.05;  // Match boot screen margin
+    uint16_t lineWidth = displayHeight * 0.005;  // Match boot screen line width
+    
+    // Create line
+    lv_obj_t* delimiter = lv_line_create(screen);
+    static lv_point_t linePoints[2];
+    linePoints[0].x = marginX;
+    linePoints[0].y = topOffset;
+    linePoints[1].x = displayWidth - marginX;
+    linePoints[1].y = topOffset;
+    
+    // Configure line
+    lv_line_set_points(delimiter, linePoints, 2);
+    lv_obj_set_style_line_color(delimiter, lv_color_hex(DisplayColors::BORDER), LV_PART_MAIN);
+    lv_obj_set_style_line_width(delimiter, lineWidth, LV_PART_MAIN);
 }
 
 void DashboardScreen::createMainContent(uint16_t startY, uint16_t height) {
     // Calculate optimal dimensions
-    uint16_t margin = displayWidth * 0.04;
-    uint16_t arcSize = min(displayWidth * 0.5, height * 0.9);  // Larger arc
-    uint16_t infoWidth = displayWidth * 0.32;  // Slightly narrower info container
+    uint16_t margin = displayWidth * 0.06;  // Increased margin
+    uint16_t arcSize = min(displayWidth * 0.45, height * 0.9);  // Reduced arc size
+    uint16_t infoWidth = displayWidth * 0.38;  // Increased info width
     
     // Center the entire content group
-    uint16_t totalWidth = arcSize + margin + infoWidth;
+    uint16_t totalWidth = arcSize + margin * 1.5 + infoWidth;  // Increased spacing
     uint16_t startX = (displayWidth - totalWidth) / 2;
     
     // Create and position temperature arc
     createTemperatureArc(arcSize, startX);
     lv_obj_set_pos(lv_obj_get_parent(arc), startX, startY + (height - arcSize) / 2);
     
-    // Position right container
-    uint16_t rightX = startX + arcSize + margin;
-    createRightContainer(infoWidth, arcSize, rightX, startY + (height - arcSize) / 2);
+    // Position right container with adjusted size
+    uint16_t rightX = startX + arcSize + margin * 1.5;
+    uint16_t containerHeight = arcSize * 0.85;  // Container height 85% of arc
+    uint16_t containerY = startY + (height - containerHeight) / 2;
+    createRightContainer(infoWidth, containerHeight, rightX, containerY);
 }
 
 void DashboardScreen::createRightContainer(uint16_t width, uint16_t height, uint16_t xPos, uint16_t yPos) {
@@ -135,7 +146,7 @@ void DashboardScreen::createRightContainer(uint16_t width, uint16_t height, uint
     lv_obj_set_style_radius(right_container, height * 0.05, LV_STATE_DEFAULT);
     
     // Adjust padding based on container size
-    uint16_t padding = height * 0.06;
+    uint16_t padding = height * 0.08;
     lv_obj_set_style_pad_all(right_container, padding, LV_STATE_DEFAULT);
     
     lv_obj_set_pos(right_container, xPos, yPos);
@@ -150,9 +161,9 @@ void DashboardScreen::createRightContainer(uint16_t width, uint16_t height, uint
     modeLabel = createInfoLabel(right_container, LV_ALIGN_TOP_LEFT, 0, labelSpacing * 3 - padding, "Mode: Auto");
     
     // Dynamic font size based on container size
-    const lv_font_t* labelFont = (height >= 140) ? &lv_font_montserrat_18 :
-                                (height >= 100) ? &lv_font_montserrat_16 :
-                                                 &lv_font_montserrat_14;
+    const lv_font_t* labelFont = (height >= 140) ? &lv_font_montserrat_16 :
+                                (height >= 100) ? &lv_font_montserrat_14 :
+                                                 &lv_font_montserrat_12;
     
     lv_obj_set_style_text_font(currentSpeedLabel, labelFont, LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(targetSpeedLabel, labelFont, LV_STATE_DEFAULT);
@@ -330,25 +341,23 @@ void DashboardScreen::updateStatusIndicators(bool wifiConnected, bool mqttConnec
     MutexGuard guard(uiMutex, pdMS_TO_TICKS(10));
     if (!guard.isLocked()) return;
 
-    // Update WiFi status
-    lv_label_set_text(wifiLabel, wifiConnected ? LV_SYMBOL_WIFI : LV_SYMBOL_CLOSE);
+    // Update WiFi status with proper colors
     lv_obj_set_style_text_color(wifiLabel, 
         wifiConnected ? lv_color_hex(DisplayColors::SUCCESS) : lv_color_hex(DisplayColors::ERROR), 
         LV_STATE_DEFAULT);
 
-    // Update night mode status
+    // Update MQTT status with broadcast tower icon
+    lv_obj_set_style_text_color(mqttLabel,
+        mqttConnected ? lv_color_hex(DisplayColors::SUCCESS) : lv_color_hex(DisplayColors::ERROR),
+        LV_STATE_DEFAULT);
+
+    // Night mode status (unchanged)
     lv_color_t nightColor = nightModeActive ? lv_color_hex(DisplayColors::SUCCESS) :
                            nightModeEnabled ? lv_color_hex(DisplayColors::WORKING) :
                                             lv_color_hex(DisplayColors::INACTIVE);
     lv_obj_set_style_text_color(nightLabel, nightColor, LV_STATE_DEFAULT);
 
-    // Update MQTT status
-    lv_label_set_text(mqttLabel, mqttConnected ? "M" : "×");
-    lv_obj_set_style_text_color(mqttLabel,
-        mqttConnected ? lv_color_hex(DisplayColors::SUCCESS) : lv_color_hex(DisplayColors::ERROR),
-        LV_STATE_DEFAULT);
-
-    // Update last status directly
+    // Update last status
     lastStatus.wifiConnected = wifiConnected;
     lastStatus.mqttConnected = mqttConnected;
     lastStatus.nightModeEnabled = nightModeEnabled;

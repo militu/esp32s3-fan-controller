@@ -1,6 +1,10 @@
 #include "boot_screen.h"
 #include "display_colors.h"
 
+/*******************************************************************************
+ * Construction / Destruction
+ ******************************************************************************/
+
 BootScreen::BootScreen()
     : displayWidth(0)
     , displayHeight(0)
@@ -22,6 +26,10 @@ BootScreen::~BootScreen() {
         vSemaphoreDelete(uiMutex);
     }
 }
+
+/*******************************************************************************
+ * Initialization & Core UI
+ ******************************************************************************/
 
 void BootScreen::begin() {
     if (initialized) return;
@@ -76,73 +84,6 @@ void BootScreen::createUI() {
     lv_scr_load(screen);
 }
 
-void BootScreen::createStatusSection(const char* title, uint16_t yOffset, 
-                                   lv_obj_t** statusLabel, lv_obj_t** detailLabel) {
-    // Container dimensions
-    uint16_t containerWidth = displayWidth * 0.9;
-    uint16_t containerHeight = displayHeight * 0.18;  // Fixed proportion of display height
-    
-    // Calculate padding and spacing
-    uint16_t padding = containerHeight * 0.15;        // 15% of container height for padding
-    
-    // Create container
-    lv_obj_t* cont = lv_obj_create(screen);
-    lv_obj_set_size(cont, containerWidth, containerHeight);
-    lv_obj_align(cont, LV_ALIGN_TOP_MID, 0, yOffset);
-    
-    // Container styling
-    lv_obj_set_style_bg_color(cont, lv_color_hex(DisplayColors::BG_DARK), LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_opa(cont, LV_OPA_50, LV_STATE_DEFAULT);
-    lv_obj_set_style_border_color(cont, lv_color_hex(DisplayColors::BORDER), LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(cont, displayWidth * 0.002, LV_STATE_DEFAULT);
-    lv_obj_set_style_radius(cont, containerHeight * 0.1, LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_all(cont, padding, LV_STATE_DEFAULT);
-    
-    // Disable scrolling on container
-    lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
-
-    // Calculate label dimensions
-    uint16_t availableWidth = containerWidth - (padding * 2);
-    uint16_t availableHeight = containerHeight - (padding * 2);
-    uint16_t labelSpacing = availableHeight * 0.1;  // 10% spacing between labels
-
-    // Status Label
-    *statusLabel = lv_label_create(cont);
-    lv_obj_set_width(*statusLabel, availableWidth);
-    lv_obj_set_style_pad_all(*statusLabel, 0, LV_STATE_DEFAULT);
-    lv_label_set_text(*statusLabel, title);
-    
-    // Select font size based on container height
-    const lv_font_t* statusFont = (containerHeight >= 100) ? &lv_font_montserrat_16 :
-                                 (containerHeight >= 80)  ? &lv_font_montserrat_14 :
-                                                          &lv_font_montserrat_12;
-    lv_obj_set_style_text_font(*statusLabel, statusFont, LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(*statusLabel, lv_color_hex(DisplayColors::TEXT_PRIMARY), LV_STATE_DEFAULT);
-    
-    // Position status label at top
-    lv_obj_align(*statusLabel, LV_ALIGN_TOP_LEFT, 0, 0);
-
-    // Detail Label
-    *detailLabel = lv_label_create(cont);
-    lv_obj_set_width(*detailLabel, availableWidth);
-    lv_obj_set_style_pad_all(*detailLabel, 0, LV_STATE_DEFAULT);
-    lv_label_set_text(*detailLabel, "Pending...");
-    
-    // Select smaller font for detail text
-    const lv_font_t* detailFont = (containerHeight >= 100) ? &lv_font_montserrat_14 :
-                                 (containerHeight >= 80)  ? &lv_font_montserrat_12 :
-                                                          &lv_font_montserrat_10;
-    lv_obj_set_style_text_font(*detailLabel, detailFont, LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(*detailLabel, lv_color_hex(DisplayColors::TEXT_SECONDARY), LV_STATE_DEFAULT);
-    
-    // Position detail label below status label with spacing
-    lv_obj_align_to(*detailLabel, *statusLabel, LV_ALIGN_OUT_BOTTOM_LEFT, 0, labelSpacing);
-    
-    // Configure text wrapping
-    lv_label_set_long_mode(*detailLabel, LV_LABEL_LONG_WRAP);
-    lv_obj_set_style_text_line_space(*detailLabel, 2, LV_STATE_DEFAULT);  // Add some line spacing
-}
-
 void BootScreen::createMainScreen() {
     screen = lv_obj_create(NULL);
     lv_obj_set_scrollbar_mode(screen, LV_SCROLLBAR_MODE_OFF);
@@ -154,17 +95,9 @@ void BootScreen::createMainScreen() {
     lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, LV_STATE_DEFAULT);
 }
 
-const lv_font_t* BootScreen::selectDynamicFont(uint16_t width) {
-    if (width >= 480) return &lv_font_montserrat_16;
-    if (width >= 320) return &lv_font_montserrat_14;
-    return &lv_font_montserrat_12;
-}
-
-const lv_font_t* BootScreen::selectDetailFont(uint16_t width) {
-    if (width >= 480) return &lv_font_montserrat_14;
-    if (width >= 320) return &lv_font_montserrat_12;
-    return &lv_font_montserrat_10;
-}
+/*******************************************************************************
+ * Status Management
+ ******************************************************************************/
 
 void BootScreen::updateStatus(const char* component, ComponentStatus status) {
     MutexGuard guard(uiMutex, pdMS_TO_TICKS(100));
@@ -235,6 +168,113 @@ void BootScreen::updateStatusWithDetail(const char* component, ComponentStatus s
     }
 }
 
+lv_color_t BootScreen::getStatusColor(ComponentStatus status) {
+    switch (status) {
+        case ComponentStatus::PENDING: return lv_color_hex(DisplayColors::INACTIVE);
+        case ComponentStatus::WORKING: return lv_color_hex(DisplayColors::WORKING);
+        case ComponentStatus::SUCCESS: return lv_color_hex(DisplayColors::SUCCESS);
+        case ComponentStatus::FAILED:  return lv_color_hex(DisplayColors::ERROR);
+        default: return lv_color_hex(DisplayColors::TEXT_PRIMARY);
+    }
+}
+
+const char* BootScreen::getStatusText(ComponentStatus status) {
+    switch (status) {
+        case ComponentStatus::PENDING: return "Pending";
+        case ComponentStatus::WORKING: return "Working";
+        case ComponentStatus::SUCCESS: return "Success";
+        case ComponentStatus::FAILED:  return "Failed";
+        default: return "Unknown";
+    }
+}
+
+/*******************************************************************************
+ * UI Layout & Components
+ ******************************************************************************/
+
+void BootScreen::createStatusSection(const char* title, uint16_t yOffset, 
+                                   lv_obj_t** statusLabel, lv_obj_t** detailLabel) {
+    // Container dimensions
+    uint16_t containerWidth = displayWidth * 0.9;
+    uint16_t containerHeight = displayHeight * 0.18;  // Fixed proportion of display height
+    
+    // Calculate padding and spacing
+    uint16_t padding = containerHeight * 0.15;        // 15% of container height for padding
+    
+    // Create container
+    lv_obj_t* cont = lv_obj_create(screen);
+    lv_obj_set_size(cont, containerWidth, containerHeight);
+    lv_obj_align(cont, LV_ALIGN_TOP_MID, 0, yOffset);
+    
+    // Container styling
+    lv_obj_set_style_bg_color(cont, lv_color_hex(DisplayColors::BG_DARK), LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(cont, LV_OPA_50, LV_STATE_DEFAULT);
+    lv_obj_set_style_border_color(cont, lv_color_hex(DisplayColors::BORDER), LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(cont, displayWidth * 0.002, LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(cont, containerHeight * 0.1, LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_all(cont, padding, LV_STATE_DEFAULT);
+    
+    // Disable scrolling on container
+    lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Calculate label dimensions
+    uint16_t availableWidth = containerWidth - (padding * 2);
+    uint16_t availableHeight = containerHeight - (padding * 2);
+    uint16_t labelSpacing = availableHeight * 0.1;  // 10% spacing between labels
+
+    // Status Label
+    *statusLabel = lv_label_create(cont);
+    lv_obj_set_width(*statusLabel, availableWidth);
+    lv_obj_set_style_pad_all(*statusLabel, 0, LV_STATE_DEFAULT);
+    lv_label_set_text(*statusLabel, title);
+    
+    // Select font size based on container height
+    const lv_font_t* statusFont = (containerHeight >= 100) ? &lv_font_montserrat_16 :
+                                 (containerHeight >= 80)  ? &lv_font_montserrat_14 :
+                                                          &lv_font_montserrat_12;
+    lv_obj_set_style_text_font(*statusLabel, statusFont, LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(*statusLabel, lv_color_hex(DisplayColors::TEXT_PRIMARY), LV_STATE_DEFAULT);
+    
+    // Position status label at top
+    lv_obj_align(*statusLabel, LV_ALIGN_TOP_LEFT, 0, 0);
+
+    // Detail Label
+    *detailLabel = lv_label_create(cont);
+    lv_obj_set_width(*detailLabel, availableWidth);
+    lv_obj_set_style_pad_all(*detailLabel, 0, LV_STATE_DEFAULT);
+    lv_label_set_text(*detailLabel, "Pending...");
+    
+    // Select smaller font for detail text
+    const lv_font_t* detailFont = (containerHeight >= 100) ? &lv_font_montserrat_14 :
+                                 (containerHeight >= 80)  ? &lv_font_montserrat_12 :
+                                                          &lv_font_montserrat_10;
+    lv_obj_set_style_text_font(*detailLabel, detailFont, LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(*detailLabel, lv_color_hex(DisplayColors::TEXT_SECONDARY), LV_STATE_DEFAULT);
+    
+    // Position detail label below status label with spacing
+    lv_obj_align_to(*detailLabel, *statusLabel, LV_ALIGN_OUT_BOTTOM_LEFT, 0, labelSpacing);
+    
+    // Configure text wrapping
+    lv_label_set_long_mode(*detailLabel, LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_line_space(*detailLabel, 2, LV_STATE_DEFAULT);  // Add some line spacing
+}
+
+const lv_font_t* BootScreen::selectDynamicFont(uint16_t width) {
+    if (width >= 480) return &lv_font_montserrat_16;
+    if (width >= 320) return &lv_font_montserrat_14;
+    return &lv_font_montserrat_12;
+}
+
+const lv_font_t* BootScreen::selectDetailFont(uint16_t width) {
+    if (width >= 480) return &lv_font_montserrat_14;
+    if (width >= 320) return &lv_font_montserrat_12;
+    return &lv_font_montserrat_10;
+}
+
+/*******************************************************************************
+ * Animation & Visual Effects
+ ******************************************************************************/
+
 void BootScreen::animateContainer(lv_obj_t* container, ComponentStatus status) {
     // Set background color based on status - using darker versions of palette colors
     lv_color_t bgColor;
@@ -279,24 +319,4 @@ void BootScreen::animateContainer(lv_obj_t* container, ComponentStatus status) {
     });
     lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
     lv_anim_start(&a);
-}
-
-lv_color_t BootScreen::getStatusColor(ComponentStatus status) {
-    switch (status) {
-        case ComponentStatus::PENDING: return lv_color_hex(DisplayColors::INACTIVE);
-        case ComponentStatus::WORKING: return lv_color_hex(DisplayColors::WORKING);
-        case ComponentStatus::SUCCESS: return lv_color_hex(DisplayColors::SUCCESS);
-        case ComponentStatus::FAILED:  return lv_color_hex(DisplayColors::ERROR);
-        default: return lv_color_hex(DisplayColors::TEXT_PRIMARY);
-    }
-}
-
-const char* BootScreen::getStatusText(ComponentStatus status) {
-    switch (status) {
-        case ComponentStatus::PENDING: return "Pending";
-        case ComponentStatus::WORKING: return "Working";
-        case ComponentStatus::SUCCESS: return "Success";
-        case ComponentStatus::FAILED:  return "Failed";
-        default: return "Unknown";
-    }
 }

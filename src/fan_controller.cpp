@@ -9,9 +9,9 @@
 // Static member initialization
 volatile uint32_t FanController::pulseCount = 0;
 
-//-----------------------------------------------------------------------------
-// Constructor & Destructor
-//-----------------------------------------------------------------------------
+/*******************************************************************************
+ * Construction / Destruction
+ ******************************************************************************/
 
 FanController::FanController(TaskManager& tm, ConfigPreference& config)
     : taskManager(tm)
@@ -21,16 +21,16 @@ FanController::FanController(TaskManager& tm, ConfigPreference& config)
     , tempSensor(nullptr)
     , ntpManager(nullptr)
     , config{
-        .minTemp = DEFAULT_MIN_TEMP,
-        .maxTemp = DEFAULT_MAX_TEMP,
-        .minSpeed = FAN_MIN_SPEED,
-        .maxSpeed = FAN_MAX_SPEED,
-        .minPWM = FAN_MIN_PWM,
-        .maxPWM = FAN_MAX_PWM,
-        .nightMaxSpeed = NIGHT_MODE_MAX_SPEED,
-        .minRPM = RPM_MINIMUM,
-        .nightStartHour = NIGHT_MODE_START,
-        .nightEndHour = NIGHT_MODE_END,
+        .minTemp = Config::Temperature::Control::MIN_TEMP,
+        .maxTemp = Config::Temperature::Control::MAX_TEMP,
+        .minSpeed = Config::Fan::Speed::MIN_PERCENT,
+        .maxSpeed = Config::Fan::Speed::MAX_PERCENT,
+        .minPWM = Config::Fan::Speed::MIN_PWM,
+        .maxPWM = Config::Fan::Speed::MAX_PWM,
+        .nightMaxSpeed = Config::NightMode::MAX_SPEED,
+        .minRPM = Config::Fan::RPM::MINIMUM,
+        .nightStartHour = Config::NightMode::START_HOUR,
+        .nightEndHour = Config::NightMode::END_HOUR,
         .testMode = true     // Enable test mode for Wokwi
     }
     , mode(Mode::AUTO)
@@ -54,9 +54,9 @@ FanController::~FanController() {
     if (events) vEventGroupDelete(events);
 }
 
-//-----------------------------------------------------------------------------
-// Initialization
-//-----------------------------------------------------------------------------
+/*******************************************************************************
+ * Initialization
+ ******************************************************************************/
 
 esp_err_t FanController::begin() {
     if (!mutex || !events) return ESP_ERR_NO_MEM;
@@ -72,7 +72,7 @@ esp_err_t FanController::begin() {
     target.requestedSpeed = config.minSpeed;
     target.effectiveSpeed = config.minSpeed;
     currentSpeed = config.minSpeed;
-    ledcWrite(PWM_CHANNEL, SpeedToRawPWM(currentSpeed));
+    ledcWrite(Config::Fan::PWM::CHANNEL, SpeedToRawPWM(currentSpeed));
 
     TaskManager::TaskConfig taskConfig("Fan", TASK_STACK_SIZE, TASK_PRIORITY, TASK_CORE);
     esp_err_t err = taskManager.createTask(taskConfig, fanTask, this);
@@ -88,11 +88,11 @@ esp_err_t FanController::begin() {
     return ESP_OK;
 }
 
-//-----------------------------------------------------------------------------
-// Speed Control Methods
-//-----------------------------------------------------------------------------
+/*******************************************************************************
+ * Speed Control Methods
+ ******************************************************************************/
 
-void FanController::updateTargetSpeed(int requestedSpeed) {
+void FanController::updateTargetSpeed(uint8_t requestedSpeed) {
     target.requestedSpeed = requestedSpeed;
     
     if (nightModeEnabled && isNightTime()) {
@@ -104,11 +104,11 @@ void FanController::updateTargetSpeed(int requestedSpeed) {
     
     if (status == Status::OK && currentSpeed != target.effectiveSpeed) {
         currentSpeed = target.effectiveSpeed;
-        ledcWrite(PWM_CHANNEL, SpeedToRawPWM(currentSpeed));
+        ledcWrite(Config::Fan::PWM::CHANNEL, SpeedToRawPWM(currentSpeed));
     }
 }
 
-bool FanController::setSpeedDutyCycle(int percentSpeed) {
+bool FanController::setSpeedDutyCycle(uint8_t percentSpeed) {
     if (!initialized || mode != Mode::MANUAL) return false;
 
     MutexGuard guard(mutex);
@@ -173,9 +173,9 @@ bool FanController::setControlMode(Mode newMode) {
     return true;
 }
 
-//-----------------------------------------------------------------------------
-// Night Mode Implementation
-//-----------------------------------------------------------------------------
+/*******************************************************************************
+ * Night Mode Implementation
+ ******************************************************************************/
 
 bool FanController::setNightMode(bool enabled) {
     MutexGuard guard(mutex);
@@ -197,7 +197,7 @@ bool FanController::setNightMode(bool enabled) {
     return true;
 }
 
-bool FanController::validateNightSettings(uint8_t startHour, uint8_t endHour, int maxPercent) const {
+bool FanController::validateNightSettings(uint8_t startHour, uint8_t endHour, uint8_t maxPercent) const {
     // Validate hours
     if (startHour > 23 || endHour > 23) return false;
     
@@ -207,7 +207,7 @@ bool FanController::validateNightSettings(uint8_t startHour, uint8_t endHour, in
     return true;
 }
 
-bool FanController::setNightSettings(uint8_t startHour, uint8_t endHour, int maxPercent) {
+bool FanController::setNightSettings(uint8_t startHour, uint8_t endHour, uint8_t maxPercent) {
     MutexGuard guard(mutex);
     if (!guard.isLocked()) return false;
 
@@ -318,9 +318,9 @@ uint8_t FanController::getNightMaxSpeed() const {
     return config.nightMaxSpeed; 
 }
 
-//-----------------------------------------------------------------------------
-// Core Operation Methods
-//-----------------------------------------------------------------------------
+/*******************************************************************************
+ * Core Operation Methods
+ ******************************************************************************/
 
 void FanController::processUpdate() {
     if (!initialized) return;
@@ -336,7 +336,7 @@ void FanController::processUpdate() {
         if (stallCount >= STALL_RETRY_COUNT) {
             status = Status::SHUTOFF;
             currentSpeed = 0;
-            ledcWrite(PWM_CHANNEL, 0);
+            ledcWrite(Config::Fan::PWM::CHANNEL, 0);
             return;
         }
     } else {
@@ -390,7 +390,7 @@ void FanController::fanTask(void* parameters) {
         }
         
         // Update RPM and process fan control
-        if ((now - lastRPMUpdate) >= pdMS_TO_TICKS(RPM_UPDATE_INTERVAL)) {
+        if ((now - lastRPMUpdate) >= pdMS_TO_TICKS(Config::Fan::RPM::UPDATE_INTERVAL)) {
             fan->processUpdate();
             lastRPMUpdate = now;
         }
@@ -399,19 +399,19 @@ void FanController::fanTask(void* parameters) {
     }
 }
 
-//-----------------------------------------------------------------------------
-// Hardware Control Methods
-//-----------------------------------------------------------------------------
+/*******************************************************************************
+ * Hardware Control Methods
+ ******************************************************************************/
 
 bool FanController::setupPWM() {
-    ledcSetup(PWM_CHANNEL, PWM_FREQUENCY, PWM_RESOLUTION);
-    ledcAttachPin(FAN_PWM_PIN, PWM_CHANNEL);
+    ledcSetup(Config::Fan::PWM::CHANNEL, Config::Fan::PWM::FREQUENCY, Config::Fan::PWM::RESOLUTION);
+    ledcAttachPin(Config::Fan::PWM::PIN, Config::Fan::PWM::CHANNEL);
     return true;
 }
 
 bool FanController::setupTachometer() {
-    pinMode(FAN_TACH_PIN, INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(FAN_TACH_PIN), handleTachInterrupt, FALLING);
+    pinMode(Config::Fan::PWM::TACH_PIN, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(Config::Fan::PWM::TACH_PIN), handleTachInterrupt, FALLING);
     return true;
 }
 
@@ -433,12 +433,12 @@ void FanController::updateRPM() {
     // Calculate actual RPM from pulse count
     uint32_t pulses = pulseCount;
     pulseCount = 0;
-    measuredRPM = (pulses * 60) / (RPM_UPDATE_INTERVAL / 1000.0) / FAN_PULSES_PER_REV;
+    measuredRPM = (pulses * 60) / (Config::Fan::RPM::UPDATE_INTERVAL / 1000.0) / Config::Fan::RPM::PULSES_PER_REV;
 }
 
-//-----------------------------------------------------------------------------
-// Status & Recovery Methods
-//-----------------------------------------------------------------------------
+/*******************************************************************************
+ * Status & Recovery Methods
+ ******************************************************************************/
 
 bool FanController::attemptRecovery() {
     MutexGuard guard(mutex);
@@ -460,35 +460,35 @@ bool FanController::isStalled() const {
     return status == Status::SHUTOFF;
 }
 
-//-----------------------------------------------------------------------------
-// Utility Methods
-//-----------------------------------------------------------------------------
+/*******************************************************************************
+ * Utility Methods
+ ******************************************************************************/
 
-int FanController::calculateSpeedForTemperature(float temp) const {
+uint8_t FanController::calculateSpeedForTemperature(float temp) const {
     temp = constrain(temp, config.minTemp, config.maxTemp);
     float ratio = (temp - config.minTemp) / (config.maxTemp - config.minTemp);
     return config.minSpeed + (ratio * (config.maxSpeed - config.minSpeed));
 }
 
-uint8_t FanController::SpeedToRawPWM(int percent) const {
+uint8_t FanController::SpeedToRawPWM(uint8_t percent) const {
     return map(constrain(percent, 0, 100), 0, 100, config.minPWM, config.maxPWM);
 }
 
-int FanController::rawPWMToSpeed(uint8_t raw) const {
+uint8_t FanController::rawPWMToSpeed(uint8_t raw) const {
     return map(raw, config.minPWM, config.maxPWM, 0, 100);
 }
 
-//-----------------------------------------------------------------------------
-// Protected Getters
-//-----------------------------------------------------------------------------
+/*******************************************************************************
+ * Protected Getters
+ ******************************************************************************/
 
-int FanController::getCurrentSpeed() const {
+uint8_t FanController::getCurrentSpeed() const {
     MutexGuard guard(mutex);
     if (!guard.isLocked()) return 0;
     return currentSpeed;
 }
 
-int FanController::getTargetSpeed() const {
+uint8_t FanController::getTargetSpeed() const {
     MutexGuard guard(mutex);
     if (!guard.isLocked()) return 0;
     return target.effectiveSpeed;
@@ -529,9 +529,9 @@ String FanController::getStatusString() const {
     return result;
 }
 
-//-----------------------------------------------------------------------------
-// Component Registration
-//-----------------------------------------------------------------------------
+/*******************************************************************************
+ * Component Registration
+ ******************************************************************************/
 
 void FanController::registerTempSensor(TempSensor* sensor) {
     MutexGuard guard(mutex);
@@ -547,9 +547,9 @@ void FanController::registerNTPManager(NTPManager* manager) {
     }
 }
 
-//-----------------------------------------------------------------------------
-// Save and load preferences
-//-----------------------------------------------------------------------------
+/*******************************************************************************
+ * Save and load preferences
+ ******************************************************************************/
 
 void FanController::saveSettings(ConfigPreference& configPref) {
     DEBUG_LOG_FAN("Saving settings - Mode: %d, Speed: %d, NightMode: %d", 

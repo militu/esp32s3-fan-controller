@@ -54,7 +54,10 @@ void setup() {
         tempSensor, fanController, configPreference
     );
     
-    if (!initializer.initialize()) {
+    // For testing, skip network initialization
+    SystemInitializer::InitConfig config(false);  // true = skip networking
+    
+    if (!initializer.initialize(config)) {
         Serial.println("System initialization failed!");
         return;
     }

@@ -7,9 +7,10 @@
 #include <Arduino.h>
 #include "lvgl.h"
 #include "fan_controller.h"
-#include "fonts/fa_moon.h"
+#include "fonts/icons.h"
 
 #define MY_MOON_SYMBOL "\xEF\x86\x86"
+#define MY_TOWER_BROADCAST "\xEF\x94\x99"
 
 
 /*******************************************************************************
