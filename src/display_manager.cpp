@@ -46,7 +46,7 @@ bool DisplayManager::begin(DisplayDriver* displayDriver) {
     lv_init();
 
     // Allocate display buffers
-    static uint32_t buf_size = driver->width() * 20;
+    static uint32_t buf_size = driver->width() * 40;
     static lv_disp_draw_buf_t draw_buf;
     static lv_color_t *buf1 = (lv_color_t *)heap_caps_malloc(
         buf_size * sizeof(lv_color_t), MALLOC_CAP_DMA);
