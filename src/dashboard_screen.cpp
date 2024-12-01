@@ -1,9 +1,14 @@
 #include "dashboard_screen.h"
 #include "display_colors.h"
 
-/**
- * @brief Constructor - Initializes all UI elements to nullptr
- */
+// Define the static string constants
+const char DashboardScreen::MY_MOON_SYMBOL[] = "\xEF\x86\x86";
+const char DashboardScreen::MY_TOWER_BROADCAST[] = "\xEF\x94\x99";
+
+/*******************************************************************************
+ * Construction / Destruction
+ ******************************************************************************/
+
 DashboardScreen::DashboardScreen()
     : displayWidth(0)
     , displayHeight(0)
@@ -30,18 +35,16 @@ DashboardScreen::~DashboardScreen() {
     }
 }
 
-/**
- * @brief Initializes the UI if not already initialized
- */
+/*******************************************************************************
+ * Core UI Management
+ ******************************************************************************/
+
 void DashboardScreen::begin() {
     if (initialized) return;
     createUI();
     initialized = true;
 }
 
-/**
- * @brief Creates and configures all UI elements
- */
 void DashboardScreen::createUI() {
     createMainScreen();
     
@@ -65,6 +68,25 @@ void DashboardScreen::createUI() {
     
     lv_scr_load(screen);
 }
+
+void DashboardScreen::init(uint16_t width, uint16_t height) {
+    displayWidth = width;
+    displayHeight = height;
+}
+
+void DashboardScreen::update(float temp, int fanSpeed, int targetSpeed, FanController::Mode mode,
+                      bool wifiConnected, bool mqttConnected, bool nightModeEnabled, bool nightModeActive) {
+    if (!initialized) return;
+
+    updateTemperatureDisplay(temp);
+    updateStatusIndicators(wifiConnected, mqttConnected, nightModeEnabled, nightModeActive);
+    updateSpeedDisplay(fanSpeed, targetSpeed);
+    updateModeDisplay(mode);
+}
+
+/*******************************************************************************
+ * UI Layout Construction
+ ******************************************************************************/
 
 void DashboardScreen::createTopStatusBar(uint16_t height) {
     // Create container for status indicators
@@ -170,27 +192,9 @@ void DashboardScreen::createRightContainer(uint16_t width, uint16_t height, uint
     lv_obj_set_style_text_font(modeLabel, labelFont, LV_STATE_DEFAULT);
 }
 
-/**
- * @brief Updates all UI elements with current system state
- */
-void DashboardScreen::update(float temp, int fanSpeed, int targetSpeed, FanController::Mode mode,
-                      bool wifiConnected, bool mqttConnected, bool nightModeEnabled, bool nightModeActive) {
-    if (!initialized) return;
-
-    updateTemperatureDisplay(temp);
-    updateStatusIndicators(wifiConnected, mqttConnected, nightModeEnabled, nightModeActive);
-    updateSpeedDisplay(fanSpeed, targetSpeed);
-    updateModeDisplay(mode);
-}
-
-/**
- * @brief Returns pointer to the temperature arc widget
- */
 lv_obj_t* DashboardScreen::getArc() {
     return arc;
 }
-
-// Private helper methods
 
 void DashboardScreen::createMainScreen() {
     screen = lv_obj_create(NULL);
@@ -252,6 +256,31 @@ void DashboardScreen::createTemperatureArc(uint16_t size, uint16_t xPos) {
     lv_label_set_text(tempLabel, "0.0°C");
 }
 
+void DashboardScreen::createStatusIndicators() {
+    // Calculate positions within left container
+    lv_coord_t containerHeight = lv_obj_get_height(left_container);
+    
+    // Get arc dimensions for reference
+    lv_obj_t* arc_container = lv_obj_get_parent(arc);
+    lv_coord_t arcHeight = lv_obj_get_height(arc_container);
+    
+    // Calculate spacing to match arc height
+    uint16_t spacing = arcHeight / 3;  // Divide height into three equal sections
+    uint16_t topOffset = (containerHeight - arcHeight) / 2;  // Align with arc top
+    
+    // Create and position labels
+    wifiLabel = createStatusLabel(left_container, LV_ALIGN_TOP_MID, 0, 0, LV_SYMBOL_WIFI);
+    nightLabel = createStatusLabel(left_container, LV_ALIGN_CENTER, 0, 0, "N");
+    mqttLabel = createStatusLabel(left_container, LV_ALIGN_BOTTOM_MID, 0, 0, "M");
+
+    // Force an initial update to ensure proper colors
+    updateStatusIndicators(false, false, false, false);
+}
+
+/*******************************************************************************
+ * UI Element Creation
+ ******************************************************************************/
+
 lv_obj_t* DashboardScreen::createStatusLabel(lv_obj_t* parent, lv_align_t align, lv_coord_t x_ofs, lv_coord_t y_ofs, const char* text) {
     lv_obj_t* label = lv_label_create(parent);
     lv_obj_align(label, align, x_ofs, y_ofs);
@@ -270,6 +299,10 @@ lv_obj_t* DashboardScreen::createInfoLabel(lv_obj_t* parent, lv_align_t align, l
     lv_label_set_text(label, text);
     return label;
 }
+
+/*******************************************************************************
+ * UI State Updates
+ ******************************************************************************/
 
 void DashboardScreen::updateTemperatureDisplay(float temp) {
     MutexGuard guard(uiMutex, pdMS_TO_TICKS(10));
@@ -309,31 +342,6 @@ void DashboardScreen::updateTemperatureDisplay(float temp) {
                           (temp < 40.0f) ? lv_color_hex(DisplayColors::TEMP_WARNING) :
                                          lv_color_hex(DisplayColors::TEMP_CRITICAL);
     lv_obj_set_style_arc_color(arc, tempColor, LV_PART_INDICATOR | LV_STATE_DEFAULT);
-}
-
-void DashboardScreen::arcAnimCallback(void* var, int32_t value) {
-    lv_arc_set_value((lv_obj_t*)var, value);
-}
-
-void DashboardScreen::createStatusIndicators() {
-    // Calculate positions within left container
-    lv_coord_t containerHeight = lv_obj_get_height(left_container);
-    
-    // Get arc dimensions for reference
-    lv_obj_t* arc_container = lv_obj_get_parent(arc);
-    lv_coord_t arcHeight = lv_obj_get_height(arc_container);
-    
-    // Calculate spacing to match arc height
-    uint16_t spacing = arcHeight / 3;  // Divide height into three equal sections
-    uint16_t topOffset = (containerHeight - arcHeight) / 2;  // Align with arc top
-    
-    // Create and position labels
-    wifiLabel = createStatusLabel(left_container, LV_ALIGN_TOP_MID, 0, 0, LV_SYMBOL_WIFI);
-    nightLabel = createStatusLabel(left_container, LV_ALIGN_CENTER, 0, 0, "N");
-    mqttLabel = createStatusLabel(left_container, LV_ALIGN_BOTTOM_MID, 0, 0, "M");
-
-    // Force an initial update to ensure proper colors
-    updateStatusIndicators(false, false, false, false);
 }
 
 void DashboardScreen::updateStatusIndicators(bool wifiConnected, bool mqttConnected, 
@@ -399,4 +407,12 @@ void DashboardScreen::updateModeDisplay(FanController::Mode mode) {
     lv_obj_set_style_text_color(modeLabel, 
         mode == FanController::Mode::AUTO ? lv_color_hex(DisplayColors::SUCCESS) : lv_color_hex(DisplayColors::TEMP_WARNING),
         LV_STATE_DEFAULT);
+}
+
+/*******************************************************************************
+ * Animation Management
+ ******************************************************************************/
+
+void DashboardScreen::arcAnimCallback(void* var, int32_t value) {
+    lv_arc_set_value((lv_obj_t*)var, value);
 }
