@@ -131,7 +131,7 @@ enum class FanMode {
 #define MQTT_MAX_RETRIES      3
 
 // Base Topic
-#define MQTT_BASE_TOPIC "fan_controller_esp_32"
+#define MQTT_BASE_TOPIC "fan_controller_amadeusmilitu_128932"
 
 // Status & Control Topics
 #define MQTT_FAN_STATE_TOPIC             MQTT_BASE_TOPIC "/status"

@@ -46,43 +46,118 @@ void DashboardScreen::createUI() {
     createMainScreen();
     
     // Calculate base dimensions and spacing
-    uint16_t margin = displayWidth * 0.04;  // 4% margin  
-
-    // Calculate widths for all elements
-    uint16_t leftContainerWidth = displayWidth * 0.1;  // 10% of width
-    uint16_t arcSize = displayWidth * 0.35;
-    uint16_t rightContainerWidth = displayWidth * 0.4;  // 35% of width
-    uint16_t containerHeight = arcSize * 0.8;
-
-    // Calculate horizontal positions
-    uint16_t leftContainerX = margin;
-    uint16_t arcX = leftContainerX + leftContainerWidth + margin;
-    uint16_t rightContainerX = arcX + arcSize + margin;
+    uint16_t margin = displayWidth * 0.04;
+    uint16_t topBarHeight = displayHeight * 0.12;
+    uint16_t delimiterHeight = displayHeight * 0.002;
     
-    // Verify layout fits within display
-    uint16_t totalWidth = leftContainerWidth + arcSize + rightContainerWidth + (margin * 4);
-    if (totalWidth > displayWidth) {
-        // Adjust sizes proportionally if they don't fit
-        float scaleFactor = (float)(displayWidth - (margin * 4)) / (float)(totalWidth - (margin * 4));
-        leftContainerWidth *= scaleFactor;
-        arcSize *= scaleFactor;
-        rightContainerWidth *= scaleFactor;
-        
-        // Recalculate positions
-        leftContainerX = margin;
-        arcX = leftContainerX + leftContainerWidth + margin;
-        rightContainerX = arcX + arcSize + margin;
-    }
+    // Create top status bar
+    createTopStatusBar(topBarHeight);
     
-    // Create elements with calculated dimensions and positions
-    createLeftContainer(leftContainerWidth, containerHeight, leftContainerX);
-    createTemperatureArc(arcSize, arcX);
-    createRightContainer(rightContainerWidth, containerHeight, rightContainerX);
-    createStatusIndicators();
+    // Create delimiter
+    createDelimiter(topBarHeight, delimiterHeight);
+    
+    // Calculate main content area dimensions
+    uint16_t contentStartY = topBarHeight + delimiterHeight + margin;
+    uint16_t contentHeight = displayHeight - contentStartY - margin;
+    
+    // Create main content
+    createMainContent(contentStartY, contentHeight);
     
     lv_scr_load(screen);
 }
 
+void DashboardScreen::createDelimiter(uint16_t topOffset, uint16_t height) {
+    lv_obj_t* delimiter = lv_obj_create(screen);
+    lv_obj_set_size(delimiter, displayWidth * 0.8, height);
+    lv_obj_align(delimiter, LV_ALIGN_TOP_MID, 0, topOffset);
+    
+    // Use working color from palette for delimiter
+    lv_obj_set_style_bg_color(delimiter, lv_color_hex(DisplayColors::WORKING), LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(delimiter, LV_OPA_40, LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(delimiter, height / 2, LV_STATE_DEFAULT);
+}
+
+void DashboardScreen::createTopStatusBar(uint16_t height) {
+    // Create container for status indicators
+    lv_obj_t* topBar = lv_obj_create(screen);
+    lv_obj_set_size(topBar, displayWidth, height);
+    lv_obj_set_pos(topBar, 0, 0);
+    lv_obj_set_style_bg_opa(topBar, LV_OPA_0, LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(topBar, 0, LV_STATE_DEFAULT);
+    
+    // Calculate margins
+    uint16_t sideMargin = displayWidth * 0.05;
+    uint16_t iconSpacing = displayWidth * 0.03;
+    
+    // Create left-side status indicators (WiFi and MQTT)
+    wifiLabel = createStatusLabel(topBar, LV_ALIGN_LEFT_MID, sideMargin, 0, LV_SYMBOL_WIFI);
+    mqttLabel = createStatusLabel(topBar, LV_ALIGN_LEFT_MID, sideMargin + iconSpacing * 3, 0, "M");
+    
+    // Create night mode indicator on the right (using moon symbol)
+    nightLabel = createStatusLabel(topBar, LV_ALIGN_RIGHT_MID, -sideMargin, 0, MY_MOON_SYMBOL);
+
+    // Very important: Set the font for this label
+    lv_obj_set_style_text_font(nightLabel, &fa_moon, LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(nightLabel, lv_color_hex(DisplayColors::TEXT_PRIMARY), LV_STATE_DEFAULT);
+
+    // Set icon sizes and style
+    const lv_font_t* iconFont = (displayHeight > 240) ? &lv_font_montserrat_24 : &lv_font_montserrat_20;
+    lv_obj_set_style_text_font(wifiLabel, iconFont, LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(mqttLabel, iconFont, LV_STATE_DEFAULT);
+}
+
+void DashboardScreen::createMainContent(uint16_t startY, uint16_t height) {
+    // Calculate optimal dimensions
+    uint16_t margin = displayWidth * 0.04;
+    uint16_t arcSize = min(displayWidth * 0.5, height * 0.9);  // Larger arc
+    uint16_t infoWidth = displayWidth * 0.32;  // Slightly narrower info container
+    
+    // Center the entire content group
+    uint16_t totalWidth = arcSize + margin + infoWidth;
+    uint16_t startX = (displayWidth - totalWidth) / 2;
+    
+    // Create and position temperature arc
+    createTemperatureArc(arcSize, startX);
+    lv_obj_set_pos(lv_obj_get_parent(arc), startX, startY + (height - arcSize) / 2);
+    
+    // Position right container
+    uint16_t rightX = startX + arcSize + margin;
+    createRightContainer(infoWidth, arcSize, rightX, startY + (height - arcSize) / 2);
+}
+
+void DashboardScreen::createRightContainer(uint16_t width, uint16_t height, uint16_t xPos, uint16_t yPos) {
+    lv_obj_t* right_container = lv_obj_create(screen);
+    
+    lv_obj_set_size(right_container, width, height);
+    lv_obj_set_style_bg_opa(right_container, LV_OPA_0, LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(right_container, 1, LV_STATE_DEFAULT);
+    lv_obj_set_style_border_color(right_container, lv_color_hex(DisplayColors::BORDER), LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(right_container, height * 0.05, LV_STATE_DEFAULT);
+    
+    // Adjust padding based on container size
+    uint16_t padding = height * 0.06;
+    lv_obj_set_style_pad_all(right_container, padding, LV_STATE_DEFAULT);
+    
+    lv_obj_set_pos(right_container, xPos, yPos);
+
+    // Calculate label positions for even distribution
+    uint16_t availableHeight = height - (padding * 2);
+    uint16_t labelSpacing = availableHeight / 4;  // Create 3 equal sections with spacing
+    
+    // Create labels with dynamic positioning
+    currentSpeedLabel = createInfoLabel(right_container, LV_ALIGN_TOP_LEFT, 0, labelSpacing - padding, "Current: 0%");
+    targetSpeedLabel = createInfoLabel(right_container, LV_ALIGN_TOP_LEFT, 0, labelSpacing * 2 - padding, "Target: 0%");
+    modeLabel = createInfoLabel(right_container, LV_ALIGN_TOP_LEFT, 0, labelSpacing * 3 - padding, "Mode: Auto");
+    
+    // Dynamic font size based on container size
+    const lv_font_t* labelFont = (height >= 140) ? &lv_font_montserrat_18 :
+                                (height >= 100) ? &lv_font_montserrat_16 :
+                                                 &lv_font_montserrat_14;
+    
+    lv_obj_set_style_text_font(currentSpeedLabel, labelFont, LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(targetSpeedLabel, labelFont, LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(modeLabel, labelFont, LV_STATE_DEFAULT);
+}
 
 /**
  * @brief Updates all UI elements with current system state
@@ -164,31 +239,6 @@ void DashboardScreen::createTemperatureArc(uint16_t size, uint16_t xPos) {
     lv_obj_set_style_text_font(tempLabel, &lv_font_montserrat_16, LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(tempLabel, lv_color_white(), LV_STATE_DEFAULT);
     lv_label_set_text(tempLabel, "0.0°C");
-}
-
-void DashboardScreen::createRightContainer(uint16_t width, uint16_t height, uint16_t xPos) {
-    lv_obj_t* right_container = lv_obj_create(screen);
-    
-    lv_obj_set_size(right_container, width, height);
-    lv_obj_set_style_bg_opa(right_container, LV_OPA_0, LV_STATE_DEFAULT);  // Transparent background
-    lv_obj_set_style_pad_all(right_container, width * 0.08, LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(right_container, 1, LV_STATE_DEFAULT);  // Thin border
-    lv_obj_set_style_border_color(right_container, lv_color_hex(DisplayColors::BORDER), LV_STATE_DEFAULT);
-    lv_obj_set_style_radius(right_container, displayWidth * 0.015, LV_STATE_DEFAULT);
-    
-    lv_obj_set_pos(right_container, xPos, (displayHeight - height) / 2);
-
-    uint16_t labelSpacing = height * 0.20;
-    uint16_t topMargin = height * 0.10;
-    
-    currentSpeedLabel = createInfoLabel(right_container, LV_ALIGN_TOP_LEFT, 10, topMargin, "Current: 0%");
-    targetSpeedLabel = createInfoLabel(right_container, LV_ALIGN_TOP_LEFT, 0, topMargin + labelSpacing, "Target: 0%");
-    modeLabel = createInfoLabel(right_container, LV_ALIGN_TOP_LEFT, 0, topMargin + labelSpacing * 2, "Mode: Auto");
-    
-    // Update font sizes
-    lv_obj_set_style_text_font(currentSpeedLabel, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(targetSpeedLabel, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(modeLabel, &lv_font_montserrat_14, LV_STATE_DEFAULT);
 }
 
 lv_obj_t* DashboardScreen::createStatusLabel(lv_obj_t* parent, lv_align_t align, lv_coord_t x_ofs, lv_coord_t y_ofs, const char* text) {

@@ -7,6 +7,10 @@
 #include <Arduino.h>
 #include "lvgl.h"
 #include "fan_controller.h"
+#include "fonts/fa_moon.h"
+
+#define MY_MOON_SYMBOL "\xEF\x86\x86"
+
 
 /*******************************************************************************
  * Class Definition
@@ -73,7 +77,12 @@ private:
     void createLeftContainer(uint16_t width, uint16_t height, uint16_t margin);
     void createTemperatureArc(uint16_t size, uint16_t xPos);
     void createStatusIndicators();
-    void createRightContainer(uint16_t width, uint16_t height, uint16_t margin);
+    void createRightContainer(uint16_t width, uint16_t height, uint16_t xPos, uint16_t yPos);
+    
+    void createTopStatusBar(uint16_t height);
+    void createDelimiter(uint16_t topOffset, uint16_t height);
+    void createMainContent(uint16_t startY, uint16_t height);
+
 
     // Helper Methods for UI Creation
     lv_obj_t* createStatusLabel(lv_obj_t* parent, lv_align_t align, lv_coord_t x_ofs, 
