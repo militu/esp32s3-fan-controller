@@ -52,7 +52,7 @@ void DashboardScreen::createUI() {
     uint16_t leftContainerWidth = displayWidth * 0.1;  // 10% of width
     uint16_t arcSize = displayWidth * 0.35;
     uint16_t rightContainerWidth = displayWidth * 0.4;  // 35% of width
-    uint16_t containerHeight = arcSize;
+    uint16_t containerHeight = arcSize * 0.8;
 
     // Calculate horizontal positions
     uint16_t leftContainerX = margin;
@@ -268,13 +268,21 @@ void DashboardScreen::arcAnimCallback(void* var, int32_t value) {
 }
 
 void DashboardScreen::createStatusIndicators() {
-    uint16_t containerHeight = lv_obj_get_height(left_container);
-    uint16_t spacing = containerHeight * 0.25;
+    // Calculate positions within left container
+    lv_coord_t containerHeight = lv_obj_get_height(left_container);
     
-    // Create labels with initial colors and states
-    wifiLabel = createStatusLabel(left_container, LV_ALIGN_TOP_MID, 0, spacing, LV_SYMBOL_WIFI);
+    // Get arc dimensions for reference
+    lv_obj_t* arc_container = lv_obj_get_parent(arc);
+    lv_coord_t arcHeight = lv_obj_get_height(arc_container);
+    
+    // Calculate spacing to match arc height
+    uint16_t spacing = arcHeight / 3;  // Divide height into three equal sections
+    uint16_t topOffset = (containerHeight - arcHeight) / 2;  // Align with arc top
+    
+    // Create and position labels
+    wifiLabel = createStatusLabel(left_container, LV_ALIGN_TOP_MID, 0, 0, LV_SYMBOL_WIFI);
     nightLabel = createStatusLabel(left_container, LV_ALIGN_CENTER, 0, 0, "N");
-    mqttLabel = createStatusLabel(left_container, LV_ALIGN_BOTTOM_MID, 0, -spacing, "M");
+    mqttLabel = createStatusLabel(left_container, LV_ALIGN_BOTTOM_MID, 0, 0, "M");
 
     // Force an initial update to ensure proper colors
     updateStatusIndicators(false, false, false, false);
