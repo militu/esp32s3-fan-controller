@@ -1,6 +1,6 @@
 # ESP32-S3 Fan Controller
 
-A fan controller system built with ESP32-S3 (originally for the Lilygo T-Display-S3), featuring temperature-based control, MQTT integration, persistent configuration, and a TFT display interface. (including a wokwi simulation)
+A fan controller system built with ESP32-S3 (originally for the Lilygo T-Display-S3), featuring temperature-based control, MQTT integration, persistent configuration, and a TFT display interface. (including a wokwi simulation) 
 
 [![ESP32-S3 Fan Controller Wokwi Screenshot](./assets/wokwi-screenshot.png?)](./assets/wokwi-screenshot.png?)
 
