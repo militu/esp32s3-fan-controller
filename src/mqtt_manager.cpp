@@ -64,9 +64,9 @@ esp_err_t MqttManager::begin() {
 
     mqttClient.setServer(Config::MQTT::SERVER, Config::MQTT::PORT);
     mqttClient.setCallback(messageCallback);
-    mqttClient.setSocketTimeout(30);  // 30 seconds timeout
-    mqttClient.setBufferSize(1024);   // Increase buffer size
-    mqttClient.setKeepAlive(60);      // 60 seconds keepalive
+    mqttClient.setSocketTimeout(5);  // 5 seconds timeout
+    mqttClient.setBufferSize(512);   // Increase buffer size
+    mqttClient.setKeepAlive(30);      // 30 seconds keepalive
 
     // Create MQTT task using TaskManager
     TaskManager::TaskConfig taskConfig("MQTT", MQTT_STACK_SIZE, MQTT_TASK_PRIORITY, MQTT_TASK_CORE);
@@ -106,20 +106,30 @@ void MqttManager::connect() {
 
     connecting = true;
     connectionAttempts++;  // Increment before attempt
+
+    // Calculate backoff delay based on attempt number (with proper type handling)
+    uint32_t baseDelay = Config::MQTT::RECONNECT_DELAY;
+    uint32_t maxDelay = 30000UL;
+    
+    // Cast to uint32_t and limit the shift value directly without min
+    uint32_t shiftAmount = (connectionAttempts > 5) ? 4U : (uint32_t)(connectionAttempts - 1);
+    uint32_t backoffDelay = baseDelay * (1U << shiftAmount);
     
     DEBUG_LOG("Starting connection attempt %d/%d", connectionAttempts, Config::MQTT::MAX_RETRIES);
-    
-    String clientId = Config::MQTT::CLIENT_ID;
-    if (mqttClient.connect(clientId.c_str())) {
+
+    delay(backoffDelay);  // Apply backoff delay
+
+    String clientId = String(Config::MQTT::CLIENT_ID) + String(random(0xffff), HEX);
+
+    if (mqttClient.connect(clientId.c_str(), nullptr, nullptr, 
+                          Config::MQTT::Topics::AVAILABILITY,
+                          0, true, "offline")) {
         DEBUG_LOG("MQTT Connected Successfully!");
-        // Publish initial availability with retained flag
         mqttClient.publish(Config::MQTT::Topics::AVAILABILITY, "online", true);
         
         if (setupSubscriptions()) {
-            DEBUG_LOG("Topics Subscribed Successfully");
             wasConnected = true;
             connecting = false;
-            // Publish initial status
             publishStatus();
             return;
         }
