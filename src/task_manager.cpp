@@ -3,13 +3,13 @@
  * @brief Implementation of the TaskManager class for FreeRTOS task management
  */
 
-#define DEBUG_LOG_TM(msg, ...) if (DEBUG_TM) { Serial.printf(msg "\n", ##__VA_ARGS__); }
+#define DEBUG_LOG_TM(msg, ...) if (Config::System::Debug::TM) { Serial.printf(msg "\n", ##__VA_ARGS__); }
 
 #include "task_manager.h"
 
-//------------------------------------------------------------------------------
-// Constructor & Destructor
-//------------------------------------------------------------------------------
+/*******************************************************************************
+ * Construction / Destruction
+ ******************************************************************************/
 
 TaskManager::TaskManager() 
     : initialized(false)
@@ -24,9 +24,9 @@ TaskManager::~TaskManager() {
     }
 }
 
-//------------------------------------------------------------------------------
-// Initialization & Shutdown
-//------------------------------------------------------------------------------
+/*******************************************************************************
+ * Initialization & Shutdown
+ ******************************************************************************/
 
 esp_err_t TaskManager::begin() {
     if (initialized) {
@@ -60,9 +60,9 @@ void TaskManager::stop() {
     suspended = false;
 }
 
-//------------------------------------------------------------------------------
-// Task Management
-//------------------------------------------------------------------------------
+/*******************************************************************************
+ * Task Management
+ ******************************************************************************/
 
 esp_err_t TaskManager::createTask(const TaskConfig& config, TaskFunction_t function, void* parameters) {
     // Validate initialization state
@@ -139,9 +139,9 @@ esp_err_t TaskManager::deleteTask(const char* taskName) {
     return ESP_OK;
 }
 
-//------------------------------------------------------------------------------
-// Resource Creation
-//------------------------------------------------------------------------------
+/*******************************************************************************
+ * Resource Creation
+ ******************************************************************************/
 
 QueueHandle_t TaskManager::createQueue(size_t queueLength, size_t itemSize) {
     if (!initialized) {
@@ -164,9 +164,9 @@ EventGroupHandle_t TaskManager::createEventGroup() {
     return xEventGroupCreate();
 }
 
-//------------------------------------------------------------------------------
-// Health Monitoring
-//------------------------------------------------------------------------------
+/*******************************************************************************
+ * Health Monitoring
+ ******************************************************************************/
 
 bool TaskManager::checkTaskHealth() {
     if (!initialized || !mutex) {
@@ -255,10 +255,6 @@ void TaskManager::dumpTaskStatus() {
     xSemaphoreGive(mutex);
 }
 
-//------------------------------------------------------------------------------
-// Utility Methods
-//------------------------------------------------------------------------------
-
 void TaskManager::updateTaskRunTime(const char* taskName) {
     if (xSemaphoreTake(mutex, portMAX_DELAY) == pdTRUE) {
         int taskIndex = findTaskIndex(taskName);
@@ -269,6 +265,10 @@ void TaskManager::updateTaskRunTime(const char* taskName) {
         xSemaphoreGive(mutex);
     }
 }
+
+/*******************************************************************************
+ * Utility Methods
+ ******************************************************************************/
 
 int TaskManager::findTaskIndex(const char* taskName) const {
     for (size_t i = 0; i < MAX_TASKS; i++) {

@@ -2,157 +2,158 @@
 #define CONFIG_H
 
 #include <Arduino.h>
+#include <cstdint>
 
-/*******************************************************************************
- * System Configuration
- ******************************************************************************/
-
-// System States
-enum class SystemState {
-    STARTING,
-    WIFI_CONNECTING,
-    WIFI_CONNECTED,
-    WIFI_ERROR,
-    RUNNING_WITH_WIFI,
-    RUNNING_WITHOUT_WIFI
-};
-
-// System Status LED
-#define STATUS_LED_PIN 33
-
-// Debug Configuration
-#define DEBUG_WIFI false
-#define DEBUG_TEMP false
-#define DEBUG_FAN  false
-#define DEBUG_MAIN false
-#define DEBUG_MQTT false
-#define DEBUG_DISPLAY false
-#define DEBUG_TM false
-#define DEBUG_NTP false
-#define DEBUG_INITIALIZER false
-#define DEBUG_PERSISTENT false
-
-/*******************************************************************************
- * WiFi Configuration
- ******************************************************************************/
-#define WIFI_SSID           "Wokwi-GUEST"
-#define WIFI_PASSWORD       ""
-#define WIFI_MAX_RETRIES    3
-#define WIFI_CHECK_INTERVAL  60000    // 1 minute
-#define WIFI_RETRY_DELAY    3000     // 3 seconds
-#define WIFI_BACKOFF_FACTOR   2        // For exponential backoff
-
-
-/*******************************************************************************
- * NTP Configuration
- ******************************************************************************/
-#define NTP_SYNC_INTERVAL   3600000  // 1 hour
-#define NTP_SYNC_TIMEOUT    5000     // 5 seconds
-#define NTP_SERVER          "pool.ntp.org"
-#define NTP_BACKUP_SERVER   "time.nist.gov"
-#define NTP_RETRY_DELAY     3000     // 3 seconds
-#define NTP_BACKOFF_FACTOR   2
-
-/*******************************************************************************
- * Temperature Sensor Configuration
- ******************************************************************************/
-#define TEMP_SENSOR_PIN     14
-#define TEMP_READ_INTERVAL  2000     // 2 seconds
-#define TEMP_MAX_RETRIES    3
-#define TEMP_SMOOTH_SAMPLES 5        // Rolling average over 5 samples
-#define TEMP_DEFAULT_VALUE  25.0
-#define TEMP_READ_TIMEOUT   1000     // 1 second
-
-// Temperature Control Thresholds
-#define DEFAULT_TARGET_TEMP 27.0         // Target temperature
-#define DEFAULT_MIN_TEMP    25.0         // Min temp for fan operation
-#define DEFAULT_MAX_TEMP    45.0         // Max temp for full fan speed
-
-/*******************************************************************************
- * Fan Hardware Configuration
- ******************************************************************************/
-// PWM Settings
-#define FAN_PWM_PIN         17           // PWM control pin
-#define FAN_TACH_PIN        16           // Tachometer input pin
-#define PWM_FREQUENCY       25000        // 25kHz for 4-wire PWM fans
-#define PWM_RESOLUTION      8            // 8-bit resolution (0-255)
-#define PWM_CHANNEL         0
-
-// Speed Limits
-#define FAN_MIN_SPEED         10           // ~10% PWM
-#define FAN_MAX_SPEED         100          // 100% PWM
-#define FAN_MIN_PWM         26           // ~10% PWM - used for conversion
-#define FAN_MAX_PWM         255          // 100% PWM - used for conversion
-
-#define RPM_MINIMUM         300          // Minimum expected RPM
-#define RPM_MAXIMUM         3300         // Maximum expected RPM
-
-// Control Parameters
-#define FAN_PULSES_PER_REV  2            // Pulses per revolution
-#define RPM_UPDATE_INTERVAL 1000          // Update RPM every second
-#define FAN_MIN_RUNTIME     10000         // Min runtime before speed change
-#define FAN_RAMP_STEP       5             // PWM change per step
-#define FAN_RAMP_INTERVAL   250           // Ms between PWM changes
-
-// Fan Status Codes
-#define FAN_STATUS_OK           0
-#define FAN_STATUS_LOW_RPM      1
-#define FAN_STATUS_STALLED      2
-#define FAN_STATUS_OVERCURRENT  3
-#define FAN_STATUS_ERROR        4
-
-// Defaults
-#define DEFAULT_FAN_MODE      "AUTO"  
-
-
-// Fan Control Modes
-enum class FanMode {
-    AUTO,
-    MANUAL,
-    ERROR
-};
-
-/*******************************************************************************
- * Night Mode Configuration
- ******************************************************************************/
-#define NIGHT_MODE_START    22            // 24-hour format
-#define NIGHT_MODE_END      7
-#define NIGHT_MODE_MAX_SPEED  40          // 40% maximum speed at night
-
-/*******************************************************************************
- * MQTT Configuration
- ******************************************************************************/
-// Connection Settings
-#define MQTT_SERVER            "broker.hivemq.com"
-#define MQTT_PORT              1883
-#define MQTT_CLIENT_ID         "esp32_fan_controller"
-#define MQTT_RECONNECT_DELAY   5000
-#define MQTT_UPDATE_INTERVAL   10000
-#define MQTT_MAX_RETRIES      3
-
-// Base Topic
 #define MQTT_BASE_TOPIC "fan_controller_esp_32"
+#define MQTT_TOPIC(suffix) MQTT_BASE_TOPIC "/" suffix
 
-// Status & Control Topics
-#define MQTT_FAN_STATE_TOPIC             MQTT_BASE_TOPIC "/status"
-#define MQTT_FAN_COMMAND_TOPIC           MQTT_BASE_TOPIC "/mode"
-#define MQTT_FAN_PRESET_STATE_TOPIC      MQTT_BASE_TOPIC "/status"
-#define MQTT_FAN_PRESET_COMMAND_TOPIC    MQTT_BASE_TOPIC "/mode"
-#define MQTT_FAN_PERCENTAGE_STATE_TOPIC  MQTT_BASE_TOPIC "/status"
-#define MQTT_FAN_PERCENTAGE_COMMAND_TOPIC MQTT_BASE_TOPIC "/mode"
+namespace Config {
+    /**
+     * @brief System-wide configuration settings
+     */
+    namespace System {
+        enum class State {
+            STARTING,
+            WIFI_CONNECTING,
+            WIFI_CONNECTED,
+            WIFI_ERROR,
+            RUNNING_WITH_WIFI,
+            RUNNING_WITHOUT_WIFI
+        };
 
-// Sensor Topics
-#define MQTT_TEMPERATURE_STATE_TOPIC     MQTT_BASE_TOPIC "/status"
-#define MQTT_RPM_STATE_TOPIC            MQTT_BASE_TOPIC "/status"
+        constexpr uint8_t STATUS_LED_PIN = 33;
 
-// Night Mode Topics
-#define MQTT_NIGHT_MODE_STATE_TOPIC      MQTT_BASE_TOPIC "/status"
-#define MQTT_NIGHT_MODE_COMMAND_TOPIC    MQTT_BASE_TOPIC "/night_mode"
-#define MQTT_NIGHT_SETTINGS_STATE_TOPIC  MQTT_BASE_TOPIC "/status"
-#define MQTT_NIGHT_SETTINGS_COMMAND_TOPIC MQTT_BASE_TOPIC "/night_settings"
+        namespace Debug {
+            constexpr bool WIFI = false;
+            constexpr bool TEMP = false;
+            constexpr bool FAN = false;
+            constexpr bool MAIN = false;
+            constexpr bool MQTT = false;
+            constexpr bool LVGL = true;
+            constexpr bool TM = false;
+            constexpr bool NTP = false;
+            constexpr bool INITIALIZER = false;
+            constexpr bool PERSISTENT = false;
+        }
+    }
 
-// System Topics
-#define MQTT_RECOVERY_TOPIC              MQTT_BASE_TOPIC "/recovery"
-#define MQTT_AVAILABILITY_TOPIC          MQTT_BASE_TOPIC "/available"
+    /**
+     * @brief WiFi connection configuration
+     */
+    namespace WiFi {
+        constexpr char SSID[] = "Wokwi-GUEST";
+        constexpr char PASSWORD[] = "";
+        constexpr uint8_t MAX_RETRIES = 3;
+        constexpr uint32_t CHECK_INTERVAL = 60000;    // 1 minute
+        constexpr uint32_t RETRY_DELAY = 3000;        // 3 seconds
+        constexpr uint8_t BACKOFF_FACTOR = 2;         // For exponential backoff
+    }
+
+    /**
+     * @brief NTP time synchronization configuration
+     */
+    namespace NTP {
+        constexpr uint32_t SYNC_INTERVAL = 3600000;   // 1 hour
+        constexpr uint32_t SYNC_TIMEOUT = 5000;       // 5 seconds
+        constexpr char SERVER[] = "pool.ntp.org";
+        constexpr char BACKUP_SERVER[] = "time.nist.gov";
+        constexpr uint32_t RETRY_DELAY = 3000;        // 3 seconds
+        constexpr uint8_t BACKOFF_FACTOR = 2;
+        constexpr uint8_t MAX_SYNC_ATTEMPTS = 3;
+    }
+
+    /**
+     * @brief Temperature sensor configuration
+     */
+    namespace Temperature {
+        constexpr uint8_t SENSOR_PIN = 14;
+        constexpr uint32_t READ_INTERVAL = 2000;      // 2 seconds
+        constexpr uint8_t MAX_RETRIES = 3;
+        constexpr uint8_t SMOOTH_SAMPLES = 5;         // Rolling average samples
+        constexpr float DEFAULT_VALUE = 25.0f;
+        constexpr uint32_t READ_TIMEOUT = 1000;       // 1 second
+
+        namespace Control {
+            constexpr float DEFAULT_TARGET = 27.0f;    // Target temperature
+            constexpr float MIN_TEMP = 25.0f;         // Min temp for fan
+            constexpr float MAX_TEMP = 45.0f;         // Max temp for fan
+        }
+    }
+
+    /**
+     * @brief Fan hardware and control configuration
+     */
+    namespace Fan {
+        namespace PWM {
+            constexpr uint8_t PIN = 17;
+            constexpr uint8_t TACH_PIN = 16;
+            constexpr uint32_t FREQUENCY = 25000;     // 25kHz
+            constexpr uint8_t RESOLUTION = 8;         // 8-bit
+            constexpr uint8_t CHANNEL = 0;
+        }
+
+        namespace Speed {
+            constexpr uint8_t MIN_PERCENT = 10;
+            constexpr uint8_t MAX_PERCENT = 100;
+            constexpr uint8_t MIN_PWM = 26;           // ~10% duty
+            constexpr uint8_t MAX_PWM = 255;          // 100% duty
+        }
+
+        namespace RPM {
+            constexpr uint16_t MINIMUM = 300;
+            constexpr uint16_t MAXIMUM = 3300;
+            constexpr uint8_t PULSES_PER_REV = 2;
+            constexpr uint32_t UPDATE_INTERVAL = 1000;  // 1 second
+        }
+
+        namespace Control {
+            constexpr uint32_t MIN_RUNTIME = 10000;    // Min time before speed change
+            constexpr uint8_t RAMP_STEP = 5;           // PWM change per step
+            constexpr uint32_t RAMP_INTERVAL = 250;    // Ms between changes
+        }
+
+        enum class Mode {
+            AUTO,
+            MANUAL,
+            ERROR
+        };
+    }
+
+    /**
+     * @brief Night mode operation configuration
+     */
+    namespace NightMode {
+        constexpr uint8_t START_HOUR = 22;
+        constexpr uint8_t END_HOUR = 7;
+        constexpr uint8_t MAX_SPEED = 40;             // 40% maximum at night
+    }
+
+    /**
+     * @brief MQTT communication configuration
+     */
+    namespace MQTT {
+        constexpr char SERVER[] = "broker.hivemq.com";
+        constexpr uint16_t PORT = 1883;
+        constexpr char CLIENT_ID[] = "esp32_fan_controller";
+        constexpr uint32_t RECONNECT_DELAY = 5000;
+        constexpr uint32_t UPDATE_INTERVAL = 10000;
+        constexpr uint8_t MAX_RETRIES = 3;
+
+        namespace Topics {
+            constexpr char BASE[] = MQTT_BASE_TOPIC;
+            
+            // Status topics
+            constexpr char SYSTEM_STATUS[] = MQTT_TOPIC("status/system");
+            constexpr char NIGHT_MODE_STATUS[] = MQTT_TOPIC("status/night_mode");
+            constexpr char AVAILABILITY[] = MQTT_TOPIC("availability");
+
+            // Control topics
+            constexpr char MODE_SET[] = MQTT_TOPIC("control/mode/set");
+            constexpr char NIGHT_MODE_SET[] = MQTT_TOPIC("control/night_mode/set");
+            constexpr char NIGHT_SETTINGS_SET[] = MQTT_TOPIC("control/night_settings/set");
+            constexpr char RECOVERY_SET[] = MQTT_TOPIC("control/recovery/set");
+        }
+    }
+}
 
 #endif // CONFIG_H

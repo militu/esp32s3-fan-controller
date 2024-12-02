@@ -76,7 +76,7 @@ void ILI9341Driver::flush(const lv_area_t* area, uint8_t* pixels) {
     tft->endWrite();
     uint32_t end = millis();
     
-    lv_disp_flush_ready((lv_disp_drv_t*)lv_disp_get_default());
+    // lv_disp_flush_ready((lv_disp_drv_t*)lv_disp_get_default());
 }
 
 /**

@@ -1,11 +1,3 @@
-/**
- * @file mqtt_manager.h
- * @brief MQTT communication manager for IoT device control
- * 
- * Handles MQTT protocol communication including connection management,
- * message processing, state synchronization, and device control.
- */
-
 #pragma once
 
 #include <Arduino.h>
@@ -21,88 +13,85 @@
 #include "fan_controller.h"
 #include "mutex_guard.h"
 
+/**
+ * @brief MQTT communication manager for IoT device control
+ * 
+ * Features:
+ * - Automatic connection and reconnection to MQTT broker
+ * - Message queueing and processing
+ * - JSON payload handling
+ * - Thread-safe operation
+ * - Status publishing and command handling
+ */
 class MqttManager {
 public:
     /**
-     * @brief Constructor
-     * @param taskManager Task management system
-     * @param tempSensor Temperature sensor interface
-     * @param fanController Fan control interface
+     * @brief Message structure for MQTT queue
      */
-    explicit MqttManager(TaskManager& taskManager, TempSensor& tempSensor, FanController& fanController);
-    
-    /**
-     * @brief Destructor - cleanup resources
-     */
-    ~MqttManager();
+    struct MQTTMessage {
+        static constexpr size_t MAX_TOPIC_LENGTH = 64;
+        static constexpr size_t MAX_PAYLOAD_LENGTH = 256;
+        
+        char topic[MAX_TOPIC_LENGTH];
+        char payload[MAX_PAYLOAD_LENGTH];
+        size_t payloadLength;
+    };
 
-    // Prevent copying
-    MqttManager(const MqttManager&) = delete;
-    MqttManager& operator=(const MqttManager&) = delete;
-
-    /**
-     * @brief Initialize the MQTT manager
-     * @return ESP_OK on success, error code otherwise
-     */
-    esp_err_t begin();
+    enum class MessageAction {
+        INVALID,
+        MODE,
+        NIGHT_MODE,
+        RECOVERY,
+        NIGHT_SETTINGS
+    };
 
     /**
-     * @brief Check connection status
-     * @return true if connected to broker
+     * @brief Connection state information
      */
-    bool isConnected();
-
-    /**
-     * @brief Check initialization status
-     * @return true if manager is initialized
-     */
-    bool isInitialized() const { return initialized; }
-
-    /**
-     * @brief Debug mutex state
-     */
-    void debugMutexState();
-
     struct ConnectionState {
         bool connecting;
         uint8_t currentAttempt;
         bool connected;
     };
 
+    // Constructor and destructor
+    explicit MqttManager(TaskManager& taskManager, 
+                        TempSensor& tempSensor, 
+                        FanController& fanController);
+    ~MqttManager();
+
+    // Prevent copying
+    MqttManager(const MqttManager&) = delete;
+    MqttManager& operator=(const MqttManager&) = delete;
+
+    // Core functionality
+    esp_err_t begin();
+    bool isConnected();
+    bool isInitialized() const { return initialized; }
+    void debugMutexState();
+
+    // Connection state query
     ConnectionState getConnectionState() {
-        MutexGuard guard(connectionMutex);
-        if (!guard.isLocked()) {
-            return {false, 0, false};
-        }
         
         return ConnectionState{
             connecting,
-            connectionAttempts,  // Use directly, no need for +1 here
+            connectionAttempts,
             mqttClient.connected()
         };
     }
 
+    uint32_t getTotalTimeout();
+
 private:
     // Constants
-    static constexpr size_t MAX_TOPIC_LENGTH = 64;
-    static constexpr size_t MAX_PAYLOAD_LENGTH = 256;
     static constexpr size_t QUEUE_SIZE = 10;
     static constexpr uint32_t QUEUE_TIMEOUT_MS = 100;
     static constexpr uint32_t MUTEX_TIMEOUT_MS = 1000;
-
     static constexpr uint32_t MQTT_STACK_SIZE = 8192;
-    static constexpr UBaseType_t MQTT_TASK_PRIORITY = 2;
+    static constexpr UBaseType_t MQTT_TASK_PRIORITY = 4;
     static constexpr BaseType_t MQTT_TASK_CORE = 1;
-
-    static constexpr unsigned long AVAILABILITY_INTERVAL = 60000;
-    static constexpr uint32_t CLIENT_LOOP_INTERVAL = 100;
-
-    // Message structure
-    struct MQTTMessage {
-        char topic[MAX_TOPIC_LENGTH];
-        char payload[MAX_PAYLOAD_LENGTH];
-        size_t payloadLength;
-    };
+    static constexpr uint32_t AVAILABILITY_INTERVAL = 30000;
+    static constexpr uint32_t CLIENT_LOOP_INTERVAL = 50;
 
     // Core components
     TaskManager& taskManager;
@@ -110,6 +99,7 @@ private:
     FanController& fanController;
     WiFiClient wifiClient;
     PubSubClient mqttClient;
+    static MqttManager* instance;
 
     // Synchronization primitives
     SemaphoreHandle_t connectionMutex;
@@ -121,40 +111,38 @@ private:
     bool initialized;
     bool updateAvailable;
     bool wasConnected;
-    static MqttManager* instance;
+    bool connecting;
+    uint8_t connectionAttempts;
 
     // Timing variables
-    unsigned long lastConnectAttempt;
-    unsigned long lastClientLoop;
-    unsigned long lastStatusUpdate;
-    unsigned long lastAvailabilityPublish;
+    uint32_t lastConnectAttempt;
+    uint32_t lastClientLoop;
+    uint32_t lastStatusUpdate;
+    uint32_t lastAvailabilityPublish;
 
-    // Connection management
+    // Connection management methods
     void connect();
     bool setupSubscriptions();
     void processUpdate();
     void publishStatus();
 
-    // Message handling
+    // Message handling methods
     static void messageCallback(char* topic, byte* payload, unsigned int length);
     void handleMessage(const char* topic, const byte* payload, unsigned int length);
-    void handleModeMessage(const JsonDocument& doc);
-    void handleNightModeMessage(const JsonDocument& doc);
-    void handleRecoveryMessage(const JsonDocument& doc);
-    void handleNightSettingsMessage(const JsonDocument& doc);
+    bool handleModeMessage(const JsonDocument& doc);
+    bool handleNightModeMessage(const JsonDocument& doc);
+    bool handleRecoveryMessage(const JsonDocument& doc);
+    bool handleNightSettingsMessage(const JsonDocument& doc);
     void processQueuedMessages();
     bool enqueueMessage(const char* topic, const byte* payload, unsigned int length);
-    
+    MessageAction determineMessageAction(const char* topic);
+
     // Publication methods
     void publishString(const char* topic, const String& value);
-    void publishJson(const char* topic, const JsonDocument& doc);
+    bool publishJson(const char* topic, const JsonDocument& doc);
+    const char* getFanStatusString(FanController::Status status);
 
-    // Utility functions
+    // Utility methods
     String getMQTTStateString(int state);
-    
-    // Task management
     static void mqttTask(void* parameters);
-
-    uint8_t connectionAttempts;
-    bool connecting;
 };

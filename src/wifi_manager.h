@@ -1,4 +1,3 @@
-// wifi_manager.h
 #ifndef WIFI_MANAGER_H
 #define WIFI_MANAGER_H
 
@@ -13,8 +12,11 @@
 /**
  * @brief Manages WiFi connectivity for the ESP32
  * 
- * Handles WiFi connection, monitoring, and reconnection attempts.
- * Uses FreeRTOS tasks for background processing and mutex for thread safety.
+ * Features:
+ * - Automatic connection and reconnection handling
+ * - Connection status monitoring 
+ * - Exponential backoff for retry attempts
+ * - Thread-safe operation with FreeRTOS
  */
 class WifiManager {
 public:
@@ -25,19 +27,19 @@ public:
     WifiManager(TaskManager& taskManager);
     ~WifiManager();
 
-    // Prevent copying to avoid resource conflicts
+    // Prevent copying
     WifiManager(const WifiManager&) = delete;
     WifiManager& operator=(const WifiManager&) = delete;
 
     /**
-     * @brief Initialize the WiFi manager and start the background task
+     * @brief Initialize the WiFi manager and start background task
      * @return esp_err_t ESP_OK on success, error code otherwise
      */
     esp_err_t begin();
 
     // Status queries
     bool isConnected() const { return WiFi.status() == WL_CONNECTED; }
-    SystemState getState() const { return currentState; }
+    Config::System::State getState() const { return currentState; }
     String getStatusString() const;
     IPAddress getIPAddress() const { return WiFi.localIP(); }
     int32_t getSignalStrength() const { return WiFi.RSSI(); }
@@ -46,37 +48,43 @@ public:
     static void wifiTask(void* parameters);
     void processUpdate();
 
+    /**
+     * @brief Get current connection attempt count
+     * @return Current attempt number (0 if not attempting)
+     */
     uint8_t getCurrentAttempt() const {
         MutexGuard guard(mutex);
         if (!guard.isLocked()) return 0;
         return connectionAttempts;
     }
 
+    uint32_t getTotalTimeout();
+
 private:
+    // Task configuration constants
+    static constexpr uint32_t WIFI_STACK_SIZE = 4096;
+    static constexpr UBaseType_t WIFI_TASK_PRIORITY = 2;
+    static constexpr BaseType_t WIFI_TASK_CORE = 0;
+    
     // Core components
     TaskManager& taskManager;
     SemaphoreHandle_t mutex;
     
     // State tracking
-    SystemState currentState;
+    Config::System::State currentState;
     bool initialized;
     uint32_t lastCheckTime;
-    uint32_t connectionAttempts;
+    uint8_t connectionAttempts;
     bool wasConnected;
+
+    // Retry mechanism
+    uint32_t currentRetryDelay;
+    uint32_t lastAttemptTime;
+    bool attemptInProgress;
 
     // Internal methods
     esp_err_t connect();
-    void updateState(SystemState newState);
-
-    // Task configuration constants
-    static constexpr uint32_t WIFI_STACK_SIZE = 4096;
-    static constexpr UBaseType_t WIFI_TASK_PRIORITY = 2;
-    static constexpr BaseType_t WIFI_TASK_CORE = 0;
-
-    uint32_t currentRetryDelay;  // For implementing backoff
-    uint32_t lastAttemptTime;     // Track when we last attempted connection
-    bool attemptInProgress;       // Flag for connection attempt in progress
-
+    void updateState(Config::System::State newState);
 };
 
 #endif // WIFI_MANAGER_H

@@ -1,14 +1,3 @@
-/**
- * @file temp_sensor.h
- * @brief Temperature sensor management class using Dallas Temperature sensors
- * 
- * Provides thread-safe temperature sensing capabilities with:
- * - Async temperature reading
- * - Temperature smoothing
- * - Error detection and recovery
- * - Status monitoring
- */
-
 #ifndef TEMP_SENSOR_H
 #define TEMP_SENSOR_H
 
@@ -25,6 +14,15 @@
 // Forward declarations
 class FanController;
 
+/**
+ * @brief Temperature sensor management using Dallas Temperature sensors
+ * 
+ * Provides thread-safe temperature sensing with:
+ * - Asynchronous temperature reading
+ * - Temperature smoothing using rolling average
+ * - Error detection and recovery
+ * - Status monitoring and reporting
+ */
 class TempSensor {
 public:
     /**
@@ -34,7 +32,7 @@ public:
     explicit TempSensor(TaskManager& taskManager);
     ~TempSensor();
 
-    // Prevent copying to avoid mutex management issues
+    // Prevent copying
     TempSensor(const TempSensor&) = delete;
     TempSensor& operator=(const TempSensor&) = delete;
 
@@ -45,17 +43,22 @@ public:
     esp_err_t begin();
 
     // Temperature reading methods - all thread-safe
-    float getCurrentTemp() const;      ///< Get the latest raw temperature reading
-    float getSmoothedTemp() const;     ///< Get the smoothed temperature value
-    bool isLastReadSuccess() const;    ///< Check if the last reading was successful
-    String getStatusString() const;    ///< Get the current sensor status as a string
+    float getCurrentTemp() const;     
+    float getSmoothedTemp() const;    
+    bool isLastReadSuccess() const;    
+    String getStatusString() const;    
 
-    // Task handling methods
-    static void tempTask(void* parameters);  ///< FreeRTOS task function
-    void processReading();                   ///< Process a temperature reading
+    // Task and process handling
+    static void tempTask(void* parameters);
+    void processReading();
     void registerFanController(FanController* controller);
 
 private:
+    // Constants - will be moved to Config namespace
+    static constexpr uint32_t TEMP_STACK_SIZE = 4096;
+    static constexpr UBaseType_t TEMP_TASK_PRIORITY = 3;
+    static constexpr BaseType_t TEMP_TASK_CORE = 1;
+
     // Hardware and system components
     TaskManager& taskManager;
     OneWire oneWire;
@@ -64,28 +67,23 @@ private:
     FanController* fanController;
 
     // Temperature data
-    float currentTemp;         ///< Current raw temperature reading
-    float smoothedTemp;        ///< Smoothed temperature value
-    float tempHistory[TEMP_SMOOTH_SAMPLES];  ///< History buffer for smoothing
-    size_t historyIndex;      ///< Current position in history buffer
+    float currentTemp;         
+    float smoothedTemp;        
+    float tempHistory[Config::Temperature::SMOOTH_SAMPLES];
+    size_t historyIndex;      
 
     // Status tracking
-    bool lastReadSuccess;      ///< Flag indicating last read success
-    uint32_t lastReadTime;     ///< Timestamp of last reading
-    uint8_t consecutiveFailures;  ///< Count of consecutive failed readings
-    bool initialized;          ///< Sensor initialization status
-    bool conversionRequested;  ///< Flag for pending temperature conversion
-    uint32_t conversionRequestTime;  ///< Timestamp of last conversion request
+    bool lastReadSuccess;      
+    uint32_t lastReadTime;     
+    uint8_t consecutiveFailures;
+    bool initialized;         
+    bool conversionRequested; 
+    uint32_t conversionRequestTime;
 
     // Helper methods
-    void updateSmoothing(float newTemp);  ///< Update smoothing buffer
-    bool startConversion();               ///< Start temperature conversion
-    bool readTemperature();               ///< Read temperature from sensor
-
-    // Task configuration constants
-    static constexpr uint32_t TEMP_STACK_SIZE = 4096;
-    static constexpr UBaseType_t TEMP_TASK_PRIORITY = 3;
-    static constexpr BaseType_t TEMP_TASK_CORE = 1;
+    void updateSmoothing(float newTemp);
+    bool startConversion();
+    bool readTemperature();
 };
 
 #endif // TEMP_SENSOR_H

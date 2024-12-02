@@ -62,7 +62,7 @@ bool ConfigPreference::loadFanSettings(FanSettings& settings) {
     settings.fanMode = prefs.getUChar("fanMode", 0);  // 0 = AUTO mode
     DEBUG_LOG_PERSISTENT("LOAD CONFIG: FanMode=%d\n", settings.fanMode);
     
-    settings.manualSpeed = prefs.getUChar("manSpeed", FAN_MIN_SPEED);
+    settings.manualSpeed = prefs.getUChar("manSpeed", Config::Fan::Speed::MIN_PERCENT);
     DEBUG_LOG_PERSISTENT("LOAD CONFIG: ManSpeed=%d\n", settings.manualSpeed);
     
     settings.nightModeEnabled = prefs.getBool("nightMode", false);
@@ -72,20 +72,20 @@ bool ConfigPreference::loadFanSettings(FanSettings& settings) {
     if (settings.fanMode > 1) {  // If ERROR or invalid, set to AUTO
         settings.fanMode = 0;
     }
-    settings.nightStartHour = prefs.getUChar("nightStart", NIGHT_MODE_START);
-    settings.nightEndHour = prefs.getUChar("nightEnd", NIGHT_MODE_END);
-    settings.nightMaxSpeed = prefs.getUChar("nightSpeed", NIGHT_MODE_MAX_SPEED);
+    settings.nightStartHour = prefs.getUChar("nightStart", Config::NightMode::START_HOUR);
+    settings.nightEndHour = prefs.getUChar("nightEnd", Config::NightMode::END_HOUR);
+    settings.nightMaxSpeed = prefs.getUChar("nightSpeed", Config::NightMode::MAX_SPEED);
 
     return true;
 }
 
 void ConfigPreference::setDefaultFanSettings(FanSettings& settings) {
     settings.fanMode = 0;  // AUTO mode
-    settings.manualSpeed = FAN_MIN_SPEED;
+    settings.manualSpeed = Config::Fan::Speed::MIN_PERCENT;
     settings.nightModeEnabled = false;
-    settings.nightStartHour = NIGHT_MODE_START;
-    settings.nightEndHour = NIGHT_MODE_END;
-    settings.nightMaxSpeed = NIGHT_MODE_MAX_SPEED;
+    settings.nightStartHour = Config::NightMode::START_HOUR;
+    settings.nightEndHour = Config::NightMode::END_HOUR;
+    settings.nightMaxSpeed = Config::NightMode::MAX_SPEED;
 }
 
 bool ConfigPreference::resetToDefaults() {

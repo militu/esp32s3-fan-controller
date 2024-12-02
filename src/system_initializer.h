@@ -3,6 +3,12 @@
 // system_initializer.h
 class SystemInitializer {
 public:
+    struct InitConfig {
+        bool skipNetworking;  // If true, skips WiFi, NTP, and MQTT initialization
+
+        InitConfig(bool skip = false) : skipNetworking(skip) {}
+    };
+
     SystemInitializer(TaskManager& tasks,
                      DisplayManager& display,
                      DisplayDriver* driver,
@@ -22,7 +28,7 @@ public:
         , fanController(fan)
         , configPreference(config) {}
 
-bool initialize() {
+bool initialize(const InitConfig& config = InitConfig()) {
     // Critical components must succeed
     if (!initializeCriticalComponents()) {
         DEBUG_LOG_INIT("Critical components initialization failed");
@@ -35,24 +41,29 @@ bool initialize() {
         return false;
     }
 
-    // Network components - try in correct order but continue if they fail
-    bool wifiSuccess = initializeWifi();
-    
-    // Only try NTP and MQTT if WiFi succeeded
-    bool ntpSuccess = false;
-    bool mqttSuccess = false;
-    
-    if (wifiSuccess) {
-        ntpSuccess = initializeNTP();
-        mqttSuccess = initializeMQTT();
+    // Skip networking components if in test mode
+    if (!config.skipNetworking) {
+        // Network components - try in correct order but continue if they fail
+        bool wifiSuccess = initializeWifi();
+        
+        // Only try NTP and MQTT if WiFi succeeded
+        bool ntpSuccess = false;
+        bool mqttSuccess = false;
+        
+        if (wifiSuccess) {
+            ntpSuccess = initializeNTP();
+            mqttSuccess = initializeMQTT();
+        } else {
+            DEBUG_LOG_INIT("Skipping NTP and MQTT initialization due to WiFi failure");
+        }
+
+        DEBUG_LOG_INIT("Initialization complete - WiFi: %d, NTP: %d, MQTT: %d", 
+                    wifiSuccess, ntpSuccess, mqttSuccess);
+        delay(1000);
     } else {
-        DEBUG_LOG_INIT("Skipping NTP and MQTT initialization due to WiFi failure");
+        DEBUG_LOG_INIT("Test mode: Skipping network initialization");
+        delay(2000);
     }
-
-    DEBUG_LOG_INIT("Initialization complete - WiFi: %d, NTP: %d, MQTT: %d", 
-              wifiSuccess, ntpSuccess, mqttSuccess);
-
-    delay(1000);
 
     // Switch to dashboard screen after initialization attempts
     displayManager.switchToDashboardUI();
@@ -71,9 +82,6 @@ private:
     TempSensor& tempSensor;
     FanController& fanController;
     ConfigPreference& configPreference;
-
-    static constexpr uint32_t WIFI_TIMEOUT = 10000;
-    static constexpr uint32_t MQTT_TIMEOUT = 10000;
 
     bool initializeCriticalComponents() {
         // Initialize task manager
@@ -124,9 +132,10 @@ private:
 
         uint32_t startTime = millis();
         uint8_t lastAttempt = 0;  // Track last seen attempt
+        uint32_t wifiTimeout = wifiManager.getTotalTimeout(); 
 
         while (!wifiManager.isConnected()) {
-            if (millis() - startTime > WIFI_TIMEOUT) {
+            if (millis() - startTime > wifiTimeout) {
                 displayManager.showWifiFailed("Connection timeout");
                 return false;
             }
@@ -135,13 +144,13 @@ private:
             uint8_t currentAttempt = wifiManager.getCurrentAttempt();
             if (currentAttempt != lastAttempt) {
                 lastAttempt = currentAttempt;
-                displayManager.showWifiConnecting(currentAttempt, WIFI_MAX_RETRIES);
+                displayManager.showWifiConnecting(currentAttempt, Config::WiFi::MAX_RETRIES);
             }
             
             delay(100);
         }
 
-        displayManager.showWifiConnected(WIFI_SSID, wifiManager.getIPAddress());
+        displayManager.showWifiConnected(Config::WiFi::SSID, wifiManager.getIPAddress());
         return true;
     }
 
@@ -157,7 +166,7 @@ private:
         uint8_t lastAttempt = 0;  // Track last seen attempt
 
         while (!ntpManager.isTimeSynchronized()) {
-            if (ntpManager.getCurrentAttempt() >= NTPManager::MAX_SYNC_ATTEMPTS) {
+            if (ntpManager.getCurrentAttempt() >= Config::NTP::MAX_SYNC_ATTEMPTS) {
                 displayManager.showNTPFailed("Max attempts reached");
                 return false;
             }
@@ -174,7 +183,7 @@ private:
                 lastAttempt = currentAttempt;
                 displayManager.showNTPSyncing(
                     currentAttempt,
-                    NTPManager::MAX_SYNC_ATTEMPTS
+                    Config::NTP::MAX_SYNC_ATTEMPTS
                 );
             }
 
@@ -196,8 +205,9 @@ private:
 
         uint32_t startTime = millis();
         uint8_t lastAttempt = 0;
-        
-        while (millis() - startTime < MQTT_TIMEOUT) {
+        uint32_t mqttTimeout = mqttManager.getTotalTimeout(); 
+
+        while (millis() - startTime < mqttTimeout) {
             auto state = mqttManager.getConnectionState();
             
             // Update display when attempt number changes
@@ -206,7 +216,7 @@ private:
                 if (state.currentAttempt > 0) {  // Only show if we have an actual attempt
                     displayManager.showMQTTConnecting(
                         state.currentAttempt,
-                        MQTT_MAX_RETRIES
+                        Config::MQTT::MAX_RETRIES
                     );
                 }
             }
@@ -216,7 +226,7 @@ private:
                 return true;
             }
             
-            delay(100);
+            delay(1000);
         }
 
         displayManager.showMQTTFailed("Connection timeout");

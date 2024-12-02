@@ -43,7 +43,7 @@ struct lcd_cmd_t {
 
 // Display dimensions
 #define TFT_WIDTH              320
-#define TFT_HEIGHT_ILI9341     240
+#define TFT_HEIGHT_ILI9341     170 // To emulate lilygo
 #define TFT_HEIGHT_LILYGO      170
 
 #endif // DISPLAY_CONFIG_H
