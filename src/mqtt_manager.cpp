@@ -621,6 +621,22 @@ const char* MqttManager::getFanStatusString(FanController::Status status) {
     }
 }
 
+uint32_t MqttManager::getTotalTimeout() {
+  // Get the base reconnect delay from configuration
+  uint32_t baseDelay = Config::MQTT::RECONNECT_DELAY;
+
+  // Calculate total timeout based on the backoff strategy
+  uint32_t totalTimeout = 0;
+  for (int i = 0; i < Config::MQTT::MAX_RETRIES; i++) {
+    // Cast to uint32_t and limit the shift value directly without min
+    uint32_t shiftAmount = (i > 5) ? 4U : (uint32_t)i; 
+    uint32_t backoffDelay = baseDelay * (1U << shiftAmount);
+    totalTimeout += backoffDelay;
+  }
+
+  return totalTimeout;
+}
+
 String MqttManager::getMQTTStateString(int state) {
     switch (state) {
         case -4: return "MQTT_CONNECTION_TIMEOUT";

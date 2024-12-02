@@ -72,10 +72,6 @@ public:
 
     // Connection state query
     ConnectionState getConnectionState() {
-        MutexGuard guard(connectionMutex);
-        if (!guard.isLocked()) {
-            return {false, 0, false};
-        }
         
         return ConnectionState{
             connecting,
@@ -83,6 +79,8 @@ public:
             mqttClient.connected()
         };
     }
+
+    uint32_t getTotalTimeout();
 
 private:
     // Constants

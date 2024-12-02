@@ -182,3 +182,22 @@ void WifiManager::wifiTask(void* parameters) {
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
+
+/*******************************************************************************
+ * Utilities
+ ******************************************************************************/
+
+uint32_t WifiManager::getTotalTimeout() {
+  // Get the base retry delay from configuration
+  uint32_t baseDelay = Config::WiFi::RETRY_DELAY;
+
+  // Calculate total timeout based on the backoff strategy
+  uint32_t totalTimeout = 0;
+  uint32_t currentDelay = baseDelay; 
+  for (int i = 0; i < Config::WiFi::MAX_RETRIES; i++) {
+    totalTimeout += currentDelay;
+    currentDelay *= Config::WiFi::BACKOFF_FACTOR; 
+  }
+
+  return totalTimeout;
+}

@@ -83,9 +83,6 @@ private:
     FanController& fanController;
     ConfigPreference& configPreference;
 
-    static constexpr uint32_t WIFI_TIMEOUT = 10000;
-    static constexpr uint32_t MQTT_TIMEOUT = 10000;
-
     bool initializeCriticalComponents() {
         // Initialize task manager
         if (taskManager.begin() != ESP_OK) {
@@ -135,9 +132,10 @@ private:
 
         uint32_t startTime = millis();
         uint8_t lastAttempt = 0;  // Track last seen attempt
+        uint32_t wifiTimeout = wifiManager.getTotalTimeout(); 
 
         while (!wifiManager.isConnected()) {
-            if (millis() - startTime > WIFI_TIMEOUT) {
+            if (millis() - startTime > wifiTimeout) {
                 displayManager.showWifiFailed("Connection timeout");
                 return false;
             }
@@ -207,8 +205,9 @@ private:
 
         uint32_t startTime = millis();
         uint8_t lastAttempt = 0;
-        
-        while (millis() - startTime < MQTT_TIMEOUT) {
+        uint32_t mqttTimeout = mqttManager.getTotalTimeout(); 
+
+        while (millis() - startTime < mqttTimeout) {
             auto state = mqttManager.getConnectionState();
             
             // Update display when attempt number changes

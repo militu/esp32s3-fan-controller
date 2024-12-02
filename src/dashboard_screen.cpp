@@ -89,8 +89,10 @@ void DashboardScreen::update(float temp, int fanSpeed, int targetSpeed, FanContr
  ******************************************************************************/
 
 void DashboardScreen::createTopStatusBar(uint16_t height) {
+
     // Create container for status indicators
     lv_obj_t* topBar = lv_obj_create(screen);
+    lv_obj_set_scrollbar_mode(topBar, LV_SCROLLBAR_MODE_OFF);
     lv_obj_set_size(topBar, displayWidth, height);
     lv_obj_set_pos(topBar, 0, 0);
     

@@ -58,6 +58,8 @@ public:
         return connectionAttempts;
     }
 
+    uint32_t getTotalTimeout();
+
 private:
     // Task configuration constants
     static constexpr uint32_t WIFI_STACK_SIZE = 4096;
