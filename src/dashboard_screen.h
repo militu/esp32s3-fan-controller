@@ -54,6 +54,13 @@ private:
     lv_obj_t* wifiLabel;
     lv_obj_t* mqttLabel;
     lv_obj_t* nightLabel;
+    lv_meter_indicator_t* temperatureIndicator;
+    lv_obj_t* speedMeter;
+    lv_meter_indicator_t* targetSpeedIndicator;
+    lv_meter_indicator_t* currentSpeedIndicator;
+    lv_obj_t* speedLabel;
+    bool speedAnimationInProgress;
+    int currentTargetSpeed;
 
     // State tracking
     bool initialized;
@@ -71,6 +78,7 @@ private:
     void createTemperatureArc(uint16_t size, uint16_t xPos);
     void createRightContainer(uint16_t width, uint16_t height, uint16_t xPos, uint16_t yPos);
     void createStatusIndicators();
+    void createSpeedMeter(uint16_t size, uint16_t xPos, uint16_t yPos);
 
     // UI Helper methods
     lv_obj_t* createStatusLabel(lv_obj_t* parent, lv_align_t align, 

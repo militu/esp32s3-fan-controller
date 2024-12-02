@@ -28,8 +28,8 @@ namespace Config {
             constexpr bool TEMP = false;
             constexpr bool FAN = false;
             constexpr bool MAIN = false;
-            constexpr bool MQTT = true;
-            constexpr bool LVGL = false;
+            constexpr bool MQTT = false;
+            constexpr bool LVGL = true;
             constexpr bool TM = false;
             constexpr bool NTP = false;
             constexpr bool INITIALIZER = false;
