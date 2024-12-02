@@ -55,10 +55,11 @@ private:
     lv_meter_indicator_t* targetSpeedIndicator;
     lv_meter_indicator_t* currentSpeedIndicator;
     lv_obj_t* speedLabel;
-    bool realSpeedAnimationInProgress;
-    int currentTargetSpeed;
+    bool currentSpeedAnimationInProgress;
+    bool targetSpeedAnimationInProgress;
+    int targetSpeedValue;
     lv_obj_t* modeIndicator;
-    int currentRealSpeedValue;
+    int currentSpeedValue;
 
     // State tracking
     bool initialized;
@@ -88,6 +89,14 @@ private:
     // Animation handling
     static void set_temp_value(void* obj, int32_t v) {
         lv_meter_set_indicator_end_value((lv_obj_t*)obj, ((DashboardScreen*)lv_obj_get_user_data(lv_obj_get_parent((lv_obj_t*)obj)))->temperatureIndicator, v);
+    }
+
+    static void set_current_speed_value(void* obj, int32_t v) {
+        lv_meter_set_indicator_end_value((lv_obj_t*)obj, ((DashboardScreen*)lv_obj_get_user_data(lv_obj_get_parent((lv_obj_t*)obj)))->currentSpeedIndicator, v);
+    }
+
+    static void set_target_speed_value(void* obj, int32_t v) {
+        lv_meter_set_indicator_end_value((lv_obj_t*)obj, ((DashboardScreen*)lv_obj_get_user_data(lv_obj_get_parent((lv_obj_t*)obj)))->targetSpeedIndicator, v);
     }
 
     // Status tracking

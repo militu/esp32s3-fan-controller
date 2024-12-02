@@ -26,10 +26,10 @@ DashboardScreen::DashboardScreen()
     , targetSpeedIndicator(nullptr)
     , initialized(false)
     , tempAnimationInProgress(false)
-    , realSpeedAnimationInProgress(false)
+    , currentSpeedAnimationInProgress(false)
     , currentTempValue(0)
-    , currentRealSpeedValue(0)
-    , currentTargetSpeed(0) {
+    , currentSpeedValue(0)
+    , targetSpeedValue(0) {
     uiMutex = xSemaphoreCreateMutex();
 
 }
@@ -68,9 +68,9 @@ void DashboardScreen::begin() {
     
     // Make sure all animations are stopped and initial values are set
     tempAnimationInProgress = false;
-    realSpeedAnimationInProgress = false;
+    currentSpeedAnimationInProgress = false;
     currentTempValue = 0;
-    currentTargetSpeed = 0;
+    targetSpeedValue = 0;
     
     delay(1000);  // Give LVGL time to finish any pending operations
     // Now that everything is initialized, load the screen
@@ -196,8 +196,8 @@ void DashboardScreen::createTemperatureMeter(uint16_t size, uint16_t xPos) {
 
     // Remove the circle from the middle
     lv_obj_remove_style(tempMeter, NULL, LV_PART_INDICATOR);
+    lv_obj_remove_style(tempMeter, NULL, LV_PART_MAIN);
     lv_obj_set_style_pad_all(tempMeter, 0, LV_PART_MAIN);
-    lv_obj_remove_style(speedMeter, NULL, LV_PART_MAIN);
 
     // Add a scale
     lv_meter_scale_t* scale = lv_meter_add_scale(tempMeter);
@@ -208,10 +208,10 @@ void DashboardScreen::createTemperatureMeter(uint16_t size, uint16_t xPos) {
     lv_meter_set_scale_range(tempMeter, scale, 0, 100, 270, 135); // Match original arc's angle range
 
     // Add indicators
-    // Background arc (gray)
-    lv_meter_indicator_t* indic_bg = lv_meter_add_arc(tempMeter, scale, size * 0.1, lv_color_hex(DisplayColors::BORDER), 0);
-    lv_meter_set_indicator_start_value(tempMeter, indic_bg, 0);
-    lv_meter_set_indicator_end_value(tempMeter, indic_bg, 100);
+    // Background arc (gray) Don't know yet if I want it.
+    // lv_meter_indicator_t* indic_bg = lv_meter_add_arc(tempMeter, scale, size * 0.1, lv_color_hex(DisplayColors::BORDER), 0);
+    // lv_meter_set_indicator_start_value(tempMeter, indic_bg, 0);
+    // lv_meter_set_indicator_end_value(tempMeter, indic_bg, 100);
 
     // Main temperature indicator arc
     temperatureIndicator = lv_meter_add_arc(tempMeter, scale, size * 0.1, lv_color_hex(DisplayColors::SUCCESS), 0);
@@ -252,20 +252,15 @@ void DashboardScreen::createSpeedMeter(uint16_t size, uint16_t xPos, uint16_t yP
     lv_meter_scale_t* scale = lv_meter_add_scale(speedMeter);
     lv_meter_set_scale_ticks(speedMeter, scale, 41, 2, 10, lv_color_hex(DisplayColors::BORDER));
     lv_meter_set_scale_major_ticks(speedMeter, scale, 8, 4, 15, lv_color_hex(DisplayColors::TEXT_PRIMARY), 10);
-    lv_meter_set_scale_range(speedMeter, scale, 0, 100, 270, 135);
-
-    // Add background arc
-    lv_meter_indicator_t* indic_bg = lv_meter_add_arc(speedMeter, scale, size * 0.1, lv_color_hex(DisplayColors::BORDER), 0);
-    lv_meter_set_indicator_start_value(speedMeter, indic_bg, 0);
-    lv_meter_set_indicator_end_value(speedMeter, indic_bg, 100);
-
+    lv_meter_set_scale_range(speedMeter, scale, 0, 100, 270, 180);
+    
     // Add target speed arc
-    targetSpeedIndicator = lv_meter_add_arc(speedMeter, scale, size * 0.1, lv_color_hex(DisplayColors::SUCCESS), 0);
+    targetSpeedIndicator = lv_meter_add_arc(speedMeter, scale, size * 0.05, lv_color_hex(DisplayColors::TARGET_SPEED), 0);
     lv_meter_set_indicator_start_value(speedMeter, targetSpeedIndicator, 0);
-    lv_meter_set_indicator_end_value(speedMeter, targetSpeedIndicator, 0);
+    lv_meter_set_indicator_end_value(speedMeter, targetSpeedIndicator, 100);
 
-    // Add current speed needle
-    currentSpeedIndicator = lv_meter_add_needle_line(speedMeter, scale, 3, lv_color_hex(DisplayColors::TEXT_PRIMARY), -10);
+    // Add current speed arc
+    currentSpeedIndicator = lv_meter_add_arc(speedMeter, scale, size * 0.05, lv_color_hex(DisplayColors::CURRENT_SPEED), -size * 0.05);
     lv_meter_set_indicator_value(speedMeter, currentSpeedIndicator, 0);
 
     // Create speed label
@@ -330,7 +325,7 @@ void DashboardScreen::updateTemperatureDisplay(float temp) {
 }
 
 void DashboardScreen::updateStatusIndicators(bool wifiConnected, bool mqttConnected, 
-                                           bool nightModeEnabled, bool nightModeActive) {
+                                             bool nightModeEnabled, bool nightModeActive) {
     MutexGuard guard(uiMutex, pdMS_TO_TICKS(10));
     if (!guard.isLocked()) return;
 
@@ -358,55 +353,47 @@ void DashboardScreen::updateStatusIndicators(bool wifiConnected, bool mqttConnec
 }
 
 void DashboardScreen::updateSpeedDisplay(int fanSpeed, int targetSpeed) {
-    if (!initialized || speedMeter == nullptr || 
-        currentSpeedIndicator == nullptr || 
-        targetSpeedIndicator == nullptr || 
-        speedLabel == nullptr) return;
-
     MutexGuard guard(uiMutex, pdMS_TO_TICKS(10));
     if (!guard.isLocked()) return;
 
-    // Update target speed arc (animated)
-    if (!realSpeedAnimationInProgress && targetSpeed != currentTargetSpeed) {
+    if (!currentSpeedAnimationInProgress && fanSpeed != currentSpeedValue) {
         lv_anim_t anim;
         lv_anim_init(&anim);
         lv_anim_set_var(&anim, speedMeter);
-        lv_anim_set_exec_cb(&anim, [](void* var, int32_t v) {
-            lv_obj_t* meter = (lv_obj_t*)var;
-            auto screen = static_cast<DashboardScreen*>(lv_obj_get_user_data(lv_obj_get_parent(meter)));
-            if (screen && screen->targetSpeedIndicator) {  // Add null check
-                lv_meter_set_indicator_end_value(meter, screen->targetSpeedIndicator, v);
-            }
+        lv_anim_set_values(&anim, currentSpeedValue, fanSpeed);
+        lv_anim_set_time(&anim, 2000);
+        lv_anim_set_path_cb(&anim, lv_anim_path_ease_out);
+        lv_anim_set_exec_cb(&anim, set_current_speed_value);
+        lv_anim_set_ready_cb(&anim, [](lv_anim_t* a) {
+            ((DashboardScreen*)lv_obj_get_user_data(lv_obj_get_parent((lv_obj_t*)a->var)))->currentSpeedAnimationInProgress = false;
         });
-        // ... rest of the animation setup ...
+        
+        currentSpeedAnimationInProgress = true;
+        lv_anim_start(&anim);
+        currentSpeedValue = fanSpeed;
     }
 
-    // Update current speed needle (direct, no animation)
-    if (currentSpeedIndicator && currentRealSpeedValue != fanSpeed) {
-        lv_anim_t a;
-        lv_anim_init(&a);
-        lv_anim_set_var(&a, speedMeter);
-        lv_anim_set_exec_cb(&a, [](void* var, int32_t v) {
-            lv_obj_t* meter = (lv_obj_t*)var;
-            auto screen = static_cast<DashboardScreen*>(lv_obj_get_user_data(lv_obj_get_parent(meter)));
-            lv_meter_set_indicator_value(meter, screen->currentSpeedIndicator, v);
+    if (!targetSpeedAnimationInProgress && targetSpeed != targetSpeedValue) {
+        lv_anim_t anim;
+        lv_anim_init(&anim);
+        lv_anim_set_var(&anim, speedMeter);
+        lv_anim_set_values(&anim, targetSpeedValue, fanSpeed);
+        lv_anim_set_time(&anim, 2000);
+        lv_anim_set_path_cb(&anim, lv_anim_path_ease_out);
+        lv_anim_set_exec_cb(&anim, set_target_speed_value);
+        lv_anim_set_ready_cb(&anim, [](lv_anim_t* a) {
+            ((DashboardScreen*)lv_obj_get_user_data(lv_obj_get_parent((lv_obj_t*)a->var)))->targetSpeedAnimationInProgress = false;
         });
-        lv_anim_set_values(&a, currentRealSpeedValue, fanSpeed);
-        lv_anim_set_time(&a, 500);
-        lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
-        lv_anim_start(&a);
-        currentRealSpeedValue = fanSpeed;
+        
+        currentSpeedAnimationInProgress = true;
+        lv_anim_start(&anim);
+        targetSpeedValue = targetSpeed;
     }
 
     // Update the speed label
     char speedStr[32];
     snprintf(speedStr, sizeof(speedStr), "%d%%", fanSpeed);
     lv_label_set_text(speedLabel, speedStr);
-
-    // Update colors based on speed difference
-    lv_color_t speedColor = (abs(targetSpeed - fanSpeed) <= 5) ?
-                        lv_color_hex(DisplayColors::SUCCESS) : 
-                        lv_color_hex(DisplayColors::TEMP_WARNING);
 }
 
 void DashboardScreen::updateModeDisplay(FanController::Mode mode) {
