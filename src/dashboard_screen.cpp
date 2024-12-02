@@ -13,11 +13,8 @@ DashboardScreen::DashboardScreen()
     : displayWidth(0)
     , displayHeight(0)
     , screen(nullptr)
-    , arc(nullptr)
-    , left_container(nullptr)
+    , tempMeter(nullptr)
     , tempLabel(nullptr)
-    , currentSpeedLabel(nullptr)
-    , targetSpeedLabel(nullptr)
     , modeLabel(nullptr)
     , wifiLabel(nullptr)
     , mqttLabel(nullptr)
@@ -25,11 +22,13 @@ DashboardScreen::DashboardScreen()
     , speedMeter(nullptr)
     , speedLabel(nullptr)
     , currentSpeedIndicator(nullptr)
+    , modeIndicator(nullptr)
     , targetSpeedIndicator(nullptr)
     , initialized(false)
-    , animationInProgress(false)
-    , speedAnimationInProgress(false)
-    , currentArcValue(0)
+    , tempAnimationInProgress(false)
+    , realSpeedAnimationInProgress(false)
+    , currentTempValue(0)
+    , currentRealSpeedValue(0)
     , currentTargetSpeed(0) {
     uiMutex = xSemaphoreCreateMutex();
 
@@ -68,9 +67,9 @@ void DashboardScreen::begin() {
     createMainContent(contentStartY, contentHeight);
     
     // Make sure all animations are stopped and initial values are set
-    animationInProgress = false;
-    speedAnimationInProgress = false;
-    currentArcValue = 0;
+    tempAnimationInProgress = false;
+    realSpeedAnimationInProgress = false;
+    currentTempValue = 0;
     currentTargetSpeed = 0;
     
     delay(1000);  // Give LVGL time to finish any pending operations
@@ -93,7 +92,7 @@ void DashboardScreen::update(float temp, int fanSpeed, int targetSpeed, FanContr
     updateTemperatureDisplay(temp);
     updateStatusIndicators(wifiConnected, mqttConnected, nightModeEnabled, nightModeActive);
     updateSpeedDisplay(fanSpeed, targetSpeed);
-    // updateModeDisplay(mode);
+    updateModeDisplay(mode);
 }
 
 /*******************************************************************************
@@ -159,49 +158,11 @@ void DashboardScreen::createMainContent(uint16_t startY, uint16_t height) {
     uint16_t startX = 0;
     
     // Create and position temperature meter
-    createTemperatureArc(meterSize, startX);
-    lv_obj_set_pos(lv_obj_get_parent(arc), startX, startY + (height - meterSize) / 2);
+    createTemperatureMeter(meterSize, startX);
+    lv_obj_set_pos(lv_obj_get_parent(tempMeter), startX, startY + (height - meterSize) / 2);
     
     // Create and position speed meter
     createSpeedMeter(meterSize, startX + meterSize + margin, startY + (height - meterSize) / 2);
-}
-
-void DashboardScreen::createRightContainer(uint16_t width, uint16_t height, uint16_t xPos, uint16_t yPos) {
-    lv_obj_t* right_container = lv_obj_create(screen);
-    
-    lv_obj_set_size(right_container, width, height);
-    lv_obj_set_style_bg_opa(right_container, LV_OPA_0, LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(right_container, 1, LV_STATE_DEFAULT);
-    lv_obj_set_style_border_color(right_container, lv_color_hex(DisplayColors::BORDER), LV_STATE_DEFAULT);
-    lv_obj_set_style_radius(right_container, height * 0.05, LV_STATE_DEFAULT);
-    
-    // Adjust padding based on container size
-    uint16_t padding = height * 0.08;
-    lv_obj_set_style_pad_all(right_container, padding, LV_STATE_DEFAULT);
-    
-    lv_obj_set_pos(right_container, xPos, yPos);
-
-    // Calculate label positions for even distribution
-    uint16_t availableHeight = height - (padding * 2);
-    uint16_t labelSpacing = availableHeight / 4;  // Create 3 equal sections with spacing
-    
-    // Create labels with dynamic positioning
-    currentSpeedLabel = createInfoLabel(right_container, LV_ALIGN_TOP_LEFT, 0, labelSpacing - padding, "Current: 0%");
-    targetSpeedLabel = createInfoLabel(right_container, LV_ALIGN_TOP_LEFT, 0, labelSpacing * 2 - padding, "Target: 0%");
-    modeLabel = createInfoLabel(right_container, LV_ALIGN_TOP_LEFT, 0, labelSpacing * 3 - padding, "Mode: Auto");
-    
-    // Dynamic font size based on container size
-    const lv_font_t* labelFont = (height >= 140) ? &lv_font_montserrat_16 :
-                                (height >= 100) ? &lv_font_montserrat_14 :
-                                                 &lv_font_montserrat_12;
-    
-    lv_obj_set_style_text_font(currentSpeedLabel, labelFont, LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(targetSpeedLabel, labelFont, LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(modeLabel, labelFont, LV_STATE_DEFAULT);
-}
-
-lv_obj_t* DashboardScreen::getArc() {
-    return arc;
 }
 
 void DashboardScreen::createMainScreen() {
@@ -215,20 +176,7 @@ void DashboardScreen::createMainScreen() {
     lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, LV_STATE_DEFAULT);
 }
 
-void DashboardScreen::createLeftContainer(uint16_t width, uint16_t height, uint16_t xPos) {
-    left_container = lv_obj_create(screen);
-    
-    lv_obj_set_size(left_container, width, height);
-    lv_obj_set_style_bg_opa(left_container, LV_OPA_0, LV_STATE_DEFAULT);  // Transparent background
-    lv_obj_set_style_pad_all(left_container, width * 0.1, LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(left_container, 1, LV_STATE_DEFAULT);  // Thin border
-    lv_obj_set_style_border_color(left_container, lv_color_hex(DisplayColors::BORDER), LV_STATE_DEFAULT);
-    lv_obj_set_style_radius(left_container, displayWidth * 0.015, LV_STATE_DEFAULT);
-    
-    lv_obj_set_pos(left_container, xPos, (displayHeight - height) / 2);
-}
-
-void DashboardScreen::createTemperatureArc(uint16_t size, uint16_t xPos) {
+void DashboardScreen::createTemperatureMeter(uint16_t size, uint16_t xPos) {
     // Create container for meter
     lv_obj_t* meter_container = lv_obj_create(screen);
     lv_obj_set_size(meter_container, size * 1.1, size * 1.1);
@@ -240,36 +188,38 @@ void DashboardScreen::createTemperatureArc(uint16_t size, uint16_t xPos) {
     lv_obj_set_pos(meter_container, xPos - size * 0.05, (displayHeight - size * 1.1) / 2);
     
     // Create meter instead of arc
-    arc = lv_meter_create(meter_container);
-    lv_obj_set_size(arc, size, size);
-    lv_obj_center(arc);
+    tempMeter = lv_meter_create(meter_container);
+    lv_obj_set_size(tempMeter, size, size);
+    lv_obj_center(tempMeter);
+    lv_obj_set_style_bg_opa(tempMeter, LV_OPA_0, LV_PART_MAIN);
     lv_obj_set_user_data(meter_container, this);
 
     // Remove the circle from the middle
-    lv_obj_remove_style(arc, NULL, LV_PART_INDICATOR);
-    lv_obj_set_style_pad_all(arc, 0, LV_PART_MAIN);
+    lv_obj_remove_style(tempMeter, NULL, LV_PART_INDICATOR);
+    lv_obj_set_style_pad_all(tempMeter, 0, LV_PART_MAIN);
+    lv_obj_remove_style(speedMeter, NULL, LV_PART_MAIN);
 
     // Add a scale
-    lv_meter_scale_t* scale = lv_meter_add_scale(arc);
+    lv_meter_scale_t* scale = lv_meter_add_scale(tempMeter);
     
     // Configure scale
-    lv_meter_set_scale_ticks(arc, scale, 41, 2, 10, lv_color_hex(DisplayColors::BORDER));
-    lv_meter_set_scale_major_ticks(arc, scale, 8, 4, 15, lv_color_hex(DisplayColors::TEXT_PRIMARY), 10);
-    lv_meter_set_scale_range(arc, scale, 0, 100, 270, 135); // Match original arc's angle range
+    lv_meter_set_scale_ticks(tempMeter, scale, 41, 2, 10, lv_color_hex(DisplayColors::BORDER));
+    lv_meter_set_scale_major_ticks(tempMeter, scale, 8, 4, 15, lv_color_hex(DisplayColors::TEXT_PRIMARY), 10);
+    lv_meter_set_scale_range(tempMeter, scale, 0, 100, 270, 135); // Match original arc's angle range
 
     // Add indicators
     // Background arc (gray)
-    lv_meter_indicator_t* indic_bg = lv_meter_add_arc(arc, scale, size * 0.1, lv_color_hex(DisplayColors::BORDER), 0);
-    lv_meter_set_indicator_start_value(arc, indic_bg, 0);
-    lv_meter_set_indicator_end_value(arc, indic_bg, 100);
+    lv_meter_indicator_t* indic_bg = lv_meter_add_arc(tempMeter, scale, size * 0.1, lv_color_hex(DisplayColors::BORDER), 0);
+    lv_meter_set_indicator_start_value(tempMeter, indic_bg, 0);
+    lv_meter_set_indicator_end_value(tempMeter, indic_bg, 100);
 
     // Main temperature indicator arc
-    temperatureIndicator = lv_meter_add_arc(arc, scale, size * 0.1, lv_color_hex(DisplayColors::SUCCESS), 0);
-    lv_meter_set_indicator_start_value(arc, temperatureIndicator, 0);
-    lv_meter_set_indicator_end_value(arc, temperatureIndicator, 0);
+    temperatureIndicator = lv_meter_add_arc(tempMeter, scale, size * 0.1, lv_color_hex(DisplayColors::SUCCESS), 0);
+    lv_meter_set_indicator_start_value(tempMeter, temperatureIndicator, 0);
+    lv_meter_set_indicator_end_value(tempMeter, temperatureIndicator, 0);
 
     // Create temperature label
-    tempLabel = lv_label_create(arc);
+    tempLabel = lv_label_create(tempMeter);
     lv_obj_center(tempLabel);
     lv_obj_set_style_text_font(tempLabel, &lv_font_montserrat_16, LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(tempLabel, lv_color_white(), LV_STATE_DEFAULT);
@@ -290,10 +240,12 @@ void DashboardScreen::createSpeedMeter(uint16_t size, uint16_t xPos, uint16_t yP
     speedMeter = lv_meter_create(speed_container);
     lv_obj_set_size(speedMeter, size, size);
     lv_obj_center(speedMeter);
+    lv_obj_set_style_bg_opa(speedMeter, LV_OPA_0, LV_PART_MAIN);
     lv_obj_set_user_data(speed_container, this);
 
     // Remove default indicator circle
     lv_obj_remove_style(speedMeter, NULL, LV_PART_INDICATOR);
+    lv_obj_remove_style(speedMeter, NULL, LV_PART_MAIN);
     lv_obj_set_style_pad_all(speedMeter, 0, LV_PART_MAIN);
 
     // Add scale for speed
@@ -322,27 +274,13 @@ void DashboardScreen::createSpeedMeter(uint16_t size, uint16_t xPos, uint16_t yP
     lv_obj_set_style_text_font(speedLabel, &lv_font_montserrat_16, LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(speedLabel, lv_color_white(), LV_STATE_DEFAULT);
     lv_label_set_text(speedLabel, "0%");
-}
 
-void DashboardScreen::createStatusIndicators() {
-    // Calculate positions within left container
-    lv_coord_t containerHeight = lv_obj_get_height(left_container);
-    
-    // Get arc dimensions for reference
-    lv_obj_t* arc_container = lv_obj_get_parent(arc);
-    lv_coord_t arcHeight = lv_obj_get_height(arc_container);
-    
-    // Calculate spacing to match arc height
-    uint16_t spacing = arcHeight / 3;  // Divide height into three equal sections
-    uint16_t topOffset = (containerHeight - arcHeight) / 2;  // Align with arc top
-    
-    // Create and position labels
-    wifiLabel = createStatusLabel(left_container, LV_ALIGN_TOP_MID, 0, 0, LV_SYMBOL_WIFI);
-    nightLabel = createStatusLabel(left_container, LV_ALIGN_CENTER, 0, 0, "N");
-    mqttLabel = createStatusLabel(left_container, LV_ALIGN_BOTTOM_MID, 0, 0, "M");
-
-    // Force an initial update to ensure proper colors
-    updateStatusIndicators(false, false, false, false);
+    modeIndicator = lv_label_create(speedMeter);
+    lv_obj_set_style_text_font(modeIndicator, &lv_font_montserrat_14, LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(modeIndicator, lv_color_hex(DisplayColors::SUCCESS), LV_STATE_DEFAULT);
+    // Position it at the bottom center, slightly below the center
+    lv_obj_align(modeIndicator, LV_ALIGN_CENTER, 0, size/3);
+    lv_label_set_text(modeIndicator, "AUTO");
 }
 
 /*******************************************************************************
@@ -359,63 +297,36 @@ lv_obj_t* DashboardScreen::createStatusLabel(lv_obj_t* parent, lv_align_t align,
     return label;
 }
 
-lv_obj_t* DashboardScreen::createInfoLabel(lv_obj_t* parent, lv_align_t align, lv_coord_t x_ofs, lv_coord_t y_ofs, const char* text) {
-    lv_obj_t* label = lv_label_create(parent);
-    lv_obj_align(label, align, x_ofs, y_ofs);
-    lv_obj_set_style_text_font(label, &lv_font_montserrat_14, LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(label, lv_color_hex(DisplayColors::TEXT_PRIMARY), LV_STATE_DEFAULT);
-    lv_label_set_text(label, text);
-    return label;
-}
-
 /*******************************************************************************
  * UI State Updates
  ******************************************************************************/
 
 void DashboardScreen::updateTemperatureDisplay(float temp) {
-    if (!initialized || arc == nullptr) return;
-
     MutexGuard guard(uiMutex, pdMS_TO_TICKS(10));
     if (!guard.isLocked()) return;
 
     int targetValue = constrain((int)(temp * 2), 0, 100);
     
-    // Only start new animation if we're not already animating and value changed
-    if (!animationInProgress && targetValue != currentArcValue) {
-        // Create smooth animation for the meter
+    if (!tempAnimationInProgress && targetValue != currentTempValue) {
         lv_anim_t anim;
         lv_anim_init(&anim);
-        lv_anim_set_var(&anim, arc);  // Use the meter object itself
-        lv_anim_set_exec_cb(&anim, [](void* var, int32_t v) {
-            lv_obj_t* meter = (lv_obj_t*)var;
-            auto screen = static_cast<DashboardScreen*>(lv_obj_get_user_data(lv_obj_get_parent(meter)));
-            lv_meter_set_indicator_end_value(meter, screen->temperatureIndicator, v);
-        });
-        lv_anim_set_values(&anim, currentArcValue, targetValue);
-        lv_anim_set_time(&anim, 1000);
+        lv_anim_set_var(&anim, tempMeter);
+        lv_anim_set_values(&anim, currentTempValue, targetValue);
+        lv_anim_set_time(&anim, 2000);
         lv_anim_set_path_cb(&anim, lv_anim_path_ease_out);
-        
-        // Add a ready callback to know when animation is done
+        lv_anim_set_exec_cb(&anim, set_temp_value);
         lv_anim_set_ready_cb(&anim, [](lv_anim_t* a) {
-            lv_obj_t* meter = (lv_obj_t*)a->var;
-            auto screen = static_cast<DashboardScreen*>(lv_obj_get_user_data(lv_obj_get_parent(meter)));
-            screen->animationInProgress = false;
+            ((DashboardScreen*)lv_obj_get_user_data(lv_obj_get_parent((lv_obj_t*)a->var)))->tempAnimationInProgress = false;
         });
         
-        animationInProgress = true;
+        tempAnimationInProgress = true;
         lv_anim_start(&anim);
-        currentArcValue = targetValue;
+        currentTempValue = targetValue;
     }
 
-    // Update temperature label
     char tempStr[32];
     snprintf(tempStr, sizeof(tempStr), "%.1f°C", temp);
     lv_label_set_text(tempLabel, tempStr);
-
-    // Update meter color based on temperature
-    lv_color_t tempColor = (temp < 30.0f) ? lv_color_hex(DisplayColors::TEMP_GOOD) :
-                          (temp < 40.0f) ? lv_color_hex(DisplayColors::TEMP_WARNING) :
-                                         lv_color_hex(DisplayColors::TEMP_CRITICAL);
 }
 
 void DashboardScreen::updateStatusIndicators(bool wifiConnected, bool mqttConnected, 
@@ -456,7 +367,7 @@ void DashboardScreen::updateSpeedDisplay(int fanSpeed, int targetSpeed) {
     if (!guard.isLocked()) return;
 
     // Update target speed arc (animated)
-    if (!speedAnimationInProgress && targetSpeed != currentTargetSpeed) {
+    if (!realSpeedAnimationInProgress && targetSpeed != currentTargetSpeed) {
         lv_anim_t anim;
         lv_anim_init(&anim);
         lv_anim_set_var(&anim, speedMeter);
@@ -471,8 +382,20 @@ void DashboardScreen::updateSpeedDisplay(int fanSpeed, int targetSpeed) {
     }
 
     // Update current speed needle (direct, no animation)
-    if (currentSpeedIndicator) {  // Add null check
-        lv_meter_set_indicator_value(speedMeter, currentSpeedIndicator, fanSpeed);
+    if (currentSpeedIndicator && currentRealSpeedValue != fanSpeed) {
+        lv_anim_t a;
+        lv_anim_init(&a);
+        lv_anim_set_var(&a, speedMeter);
+        lv_anim_set_exec_cb(&a, [](void* var, int32_t v) {
+            lv_obj_t* meter = (lv_obj_t*)var;
+            auto screen = static_cast<DashboardScreen*>(lv_obj_get_user_data(lv_obj_get_parent(meter)));
+            lv_meter_set_indicator_value(meter, screen->currentSpeedIndicator, v);
+        });
+        lv_anim_set_values(&a, currentRealSpeedValue, fanSpeed);
+        lv_anim_set_time(&a, 500);
+        lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+        lv_anim_start(&a);
+        currentRealSpeedValue = fanSpeed;
     }
 
     // Update the speed label
@@ -490,14 +413,8 @@ void DashboardScreen::updateModeDisplay(FanController::Mode mode) {
     MutexGuard guard(uiMutex, pdMS_TO_TICKS(10));
     if (!guard.isLocked()) return;
     
-    // Update mode label
-    char modeStr[32];
-    snprintf(modeStr, sizeof(modeStr), "Mode: %s", 
-             mode == FanController::Mode::AUTO ? "Auto" : "Manual");
-    lv_label_set_text(modeLabel, modeStr);
-    
-    // Update color based on mode
-    lv_obj_set_style_text_color(modeLabel, 
+    lv_label_set_text(modeIndicator, mode == FanController::Mode::AUTO ? "AUTO" : "MANUAL");
+    lv_obj_set_style_text_color(modeIndicator, 
         mode == FanController::Mode::AUTO ? lv_color_hex(DisplayColors::SUCCESS) : lv_color_hex(DisplayColors::TEMP_WARNING),
         LV_STATE_DEFAULT);
 }
@@ -506,6 +423,3 @@ void DashboardScreen::updateModeDisplay(FanController::Mode mode) {
  * Animation Management
  ******************************************************************************/
 
-void DashboardScreen::arcAnimCallback(void* var, int32_t value) {
-    lv_arc_set_value((lv_obj_t*)var, value);
-}
