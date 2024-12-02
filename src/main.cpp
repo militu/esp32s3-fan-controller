@@ -90,7 +90,7 @@ void performSystemHealthCheck() {
         taskManager.dumpTaskStatus();
     }
 
-    mqttManager.debugMutexState();
+    // mqttManager.debugMutexState();
 
     // Report WiFi status
     DEBUG_LOG_MAIN("WiFi Status: %s", wifiManager.getStatusString());

@@ -1,16 +1,16 @@
 /*******************************************************************************
  * Size: 24 px
  * Bpp: 4
- * Opts: --bpp 4 --size 24 --no-compress --font fa-solid-900.ttf --range 61830 --format lvgl -o fa_moon.c
+ * Opts: --bpp 4 --size 24 --no-compress --font fa-solid-900.ttf --range 61830 --format lvgl -o fa_moon_24.c
  ******************************************************************************/
 
 #include "lvgl.h"
 
-#ifndef FA_MOON
-#define FA_MOON 1
+#ifndef FA_MOON_24
+#define FA_MOON_24 1
 #endif
 
-#if FA_MOON
+#if FA_MOON_24
 
 /*-----------------
  *    BITMAPS
@@ -111,9 +111,9 @@ static lv_font_fmt_txt_dsc_t font_dsc = {
 
 /*Initialize a public general font descriptor*/
 #if LVGL_VERSION_MAJOR >= 8
-const lv_font_t fa_moon = {
+const lv_font_t fa_moon_24 = {
 #else
-lv_font_t fa_moon = {
+lv_font_t fa_moon_24 = {
 #endif
     .get_glyph_dsc = lv_font_get_glyph_dsc_fmt_txt,    /*Function pointer to get glyph's data*/
     .get_glyph_bitmap = lv_font_get_bitmap_fmt_txt,    /*Function pointer to get glyph's bitmap*/
@@ -135,5 +135,5 @@ lv_font_t fa_moon = {
 
 
 
-#endif /*#if FA_MOON*/
+#endif /*#if FA_MOON_24*/
 

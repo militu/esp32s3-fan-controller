@@ -50,7 +50,7 @@ void DashboardScreen::createUI() {
     
     // Calculate base dimensions and spacing
     uint16_t margin = displayWidth * 0.04;
-    uint16_t topBarHeight = displayHeight * 0.20;
+    uint16_t topBarHeight = displayHeight * 0.15;
     uint16_t delimiterHeight = displayHeight * 0.002;
     
     // Create top status bar
@@ -99,11 +99,11 @@ void DashboardScreen::createTopStatusBar(uint16_t height) {
     lv_obj_set_style_border_width(topBar, 0, LV_STATE_DEFAULT);
     
     // Calculate margins and spacing
-    uint16_t sideMargin = displayWidth * 0.02;
-    uint16_t iconSpacing = displayWidth * 0.15;
+    uint16_t sideMargin = displayWidth * 0.01;
+    uint16_t iconSpacing = displayWidth * 0.1;
 
     // Create status indicators with larger font
-    const lv_font_t* iconFont = &lv_font_montserrat_24;
+    const lv_font_t* iconFont = &lv_font_montserrat_16;
 
     // Left side status indicators
     wifiLabel = createStatusLabel(topBar, LV_ALIGN_LEFT_MID, sideMargin, 0, LV_SYMBOL_WIFI);
@@ -114,8 +114,8 @@ void DashboardScreen::createTopStatusBar(uint16_t height) {
 
     // Set fonts
     lv_obj_set_style_text_font(wifiLabel, iconFont, LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(mqttLabel, &fa_tower_broadcast, LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(nightLabel, &fa_moon, LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(mqttLabel, &fa_tower_broadcast_16, LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(nightLabel, &fa_moon_16, LV_STATE_DEFAULT);
 }
 
 void DashboardScreen::createDelimiter(uint16_t topOffset, uint16_t height) {

@@ -28,7 +28,7 @@ namespace Config {
             constexpr bool TEMP = false;
             constexpr bool FAN = false;
             constexpr bool MAIN = false;
-            constexpr bool MQTT = false;
+            constexpr bool MQTT = true;
             constexpr bool LVGL = false;
             constexpr bool TM = false;
             constexpr bool NTP = false;
@@ -141,12 +141,17 @@ namespace Config {
 
         namespace Topics {
             constexpr char BASE[] = MQTT_BASE_TOPIC;
-            constexpr char STATE[] = MQTT_TOPIC("status");
-            constexpr char COMMAND[] = MQTT_TOPIC("mode");
-            constexpr char NIGHT_MODE[] = MQTT_TOPIC("night_mode");
-            constexpr char NIGHT_SETTINGS[] = MQTT_TOPIC("night_settings");
-            constexpr char RECOVERY[] = MQTT_TOPIC("recovery");
-            constexpr char AVAILABILITY[] = MQTT_TOPIC("available");
+            
+            // Status topics
+            constexpr char SYSTEM_STATUS[] = MQTT_TOPIC("status/system");
+            constexpr char NIGHT_MODE_STATUS[] = MQTT_TOPIC("status/night_mode");
+            constexpr char AVAILABILITY[] = MQTT_TOPIC("availability");
+
+            // Control topics
+            constexpr char MODE_SET[] = MQTT_TOPIC("control/mode/set");
+            constexpr char NIGHT_MODE_SET[] = MQTT_TOPIC("control/night_mode/set");
+            constexpr char NIGHT_SETTINGS_SET[] = MQTT_TOPIC("control/night_settings/set");
+            constexpr char RECOVERY_SET[] = MQTT_TOPIC("control/recovery/set");
         }
     }
 }

@@ -59,10 +59,10 @@ bool initialize(const InitConfig& config = InitConfig()) {
 
         DEBUG_LOG_INIT("Initialization complete - WiFi: %d, NTP: %d, MQTT: %d", 
                     wifiSuccess, ntpSuccess, mqttSuccess);
-
         delay(1000);
     } else {
         DEBUG_LOG_INIT("Test mode: Skipping network initialization");
+        delay(2000);
     }
 
     // Switch to dashboard screen after initialization attempts
@@ -227,7 +227,7 @@ private:
                 return true;
             }
             
-            delay(100);
+            delay(1000);
         }
 
         displayManager.showMQTTFailed("Connection timeout");

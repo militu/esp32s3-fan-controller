@@ -8,8 +8,12 @@ extern "C" {
 #include "lvgl.h"
 
 // Declare the fonts
-LV_FONT_DECLARE(fa_moon);
-LV_FONT_DECLARE(fa_tower_broadcast);
+LV_FONT_DECLARE(fa_moon_24);
+LV_FONT_DECLARE(fa_moon_16);
+LV_FONT_DECLARE(fa_moon_12);
+LV_FONT_DECLARE(fa_tower_broadcast_24);
+LV_FONT_DECLARE(fa_tower_broadcast_16);
+LV_FONT_DECLARE(fa_tower_broadcast_12);
 
 #ifdef __cplusplus
 }

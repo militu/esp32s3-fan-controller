@@ -100,6 +100,8 @@ void MqttManager::connect() {
     if (connectionAttempts >= Config::MQTT::MAX_RETRIES) {
         DEBUG_LOG("Max retries reached, resetting");
         connectionAttempts = 0;
+        connecting = false;
+        return;
     }
 
     connecting = true;
@@ -110,12 +112,15 @@ void MqttManager::connect() {
     String clientId = Config::MQTT::CLIENT_ID;
     if (mqttClient.connect(clientId.c_str())) {
         DEBUG_LOG("MQTT Connected Successfully!");
+        // Publish initial availability with retained flag
         mqttClient.publish(Config::MQTT::Topics::AVAILABILITY, "online", true);
         
         if (setupSubscriptions()) {
             DEBUG_LOG("Topics Subscribed Successfully");
             wasConnected = true;
             connecting = false;
+            // Publish initial status
+            publishStatus();
             return;
         }
     }
@@ -129,26 +134,28 @@ void MqttManager::processUpdate() {
         vTaskDelay(pdMS_TO_TICKS(100));
         return;
     }
-
-    // Handle client loop first
     unsigned long now = millis();
-    
+
+    // Handle client loop and basic MQTT operations
     if (now - lastClientLoop >= CLIENT_LOOP_INTERVAL) { 
         lastClientLoop = now;
         mqttClient.loop();
     }
 
-    // Check connection state and attempt reconnection if needed
+    // Check connection and reconnect if needed
     if (!mqttClient.connected() && !connecting) {
         if (now - lastConnectAttempt >= Config::MQTT::RECONNECT_DELAY) {
             DEBUG_LOG("Attempting MQTT reconnection");
             lastConnectAttempt = now;
             connect();
         }
+        return;
     }
 
-    // Continue with normal operations if connected
+    // Connected state operations
     if (mqttClient.connected()) {
+        connectionAttempts = 0;
+
         // Publish availability status periodically
         if (now - lastAvailabilityPublish >= AVAILABILITY_INTERVAL) {
             lastAvailabilityPublish = now;
@@ -156,8 +163,10 @@ void MqttManager::processUpdate() {
             DEBUG_LOG("Published availability status");
         }
 
-        // Process queued messages and publish status
+        // Process queued messages
         processQueuedMessages();
+        
+        // Update status periodically
         if (now - lastStatusUpdate >= Config::MQTT::UPDATE_INTERVAL) {
             lastStatusUpdate = now;
             publishStatus();
@@ -173,11 +182,12 @@ bool MqttManager::setupSubscriptions() {
     }
 
     bool success = true;
-    success &= mqttClient.subscribe(Config::MQTT::Topics::COMMAND);
-    success &= mqttClient.subscribe(Config::MQTT::Topics::NIGHT_MODE);
-    success &= mqttClient.subscribe(Config::MQTT::Topics::NIGHT_SETTINGS);
-    success &= mqttClient.subscribe(Config::MQTT::Topics::STATE);
-    success &= mqttClient.subscribe(Config::MQTT::Topics::RECOVERY);
+    
+    // Control topics
+    success &= mqttClient.subscribe(Config::MQTT::Topics::MODE_SET);
+    success &= mqttClient.subscribe(Config::MQTT::Topics::NIGHT_MODE_SET);
+    success &= mqttClient.subscribe(Config::MQTT::Topics::NIGHT_SETTINGS_SET);
+    success &= mqttClient.subscribe(Config::MQTT::Topics::RECOVERY_SET);
     
     DEBUG_LOG("Subscriptions setup %s", success ? "successful" : "failed");
     return success;
@@ -259,12 +269,18 @@ void MqttManager::processQueuedMessages() {
 }
 
 void MqttManager::handleMessage(const char* topic, const byte* payload, unsigned int length) {
+    static const uint32_t JSON_PROCESSING_TIMEOUT = 1000; // 1 second timeout for JSON processing
+    static const uint32_t STATE_UPDATE_TIMEOUT = 2000;    // 2 second timeout for state updates
+    
     if (!topic || !payload || length == 0 || length >= MQTTMessage::MAX_PAYLOAD_LENGTH) {
         DEBUG_LOG("Invalid message parameters");
         return;
     }
 
-    // Copy payload to ensure null termination
+    // Store the start time for timeout checking
+    unsigned long startTime = millis();
+
+    // Copy payload to ensure null termination - done outside critical section
     char* payloadCopy = (char*)malloc(length + 1);
     if (!payloadCopy) {
         DEBUG_LOG("Failed to allocate memory for payload");
@@ -274,133 +290,192 @@ void MqttManager::handleMessage(const char* topic, const byte* payload, unsigned
     memcpy(payloadCopy, payload, length);
     payloadCopy[length] = '\0';
     
-    DEBUG_LOG("Message payload: %s", payloadCopy);
+    DEBUG_LOG("Message received - Topic: %s, Payload: %s", topic, payloadCopy);
 
-    // Parse JSON payload
+    // Parse JSON outside of any critical section
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, payloadCopy);
     
+    // Free the payload copy as soon as we're done with it
+    free(payloadCopy);
+    payloadCopy = nullptr;
+    
     if (error) {
         DEBUG_LOG("JSON parsing failed: %s", error.c_str());
-        free(payloadCopy);
         return;
     }
 
-    // Process message based on topic
+    // Check for JSON processing timeout
+    if (millis() - startTime > JSON_PROCESSING_TIMEOUT) {
+        DEBUG_LOG("JSON processing timeout");
+        return;
+    }
+
+    // Determine the message type and required action outside the critical section
+    MessageAction action = determineMessageAction(topic);
+    if (action == MessageAction::INVALID) {
+        DEBUG_LOG("Invalid message action for topic: %s", topic);
+        return;
+    }
+
+    bool needsUpdate = false;
+    bool success = false;
+
+    // Minimal critical section for state updates
     {
         MutexGuard guard(messageMutex);
         if (!guard.isLocked()) {
             DEBUG_LOG("Failed to acquire mutex for message handling");
-            free(payloadCopy);
             return;
         }
 
-        if (strcmp(topic, Config::MQTT::Topics::COMMAND) == 0) {
-            handleModeMessage(doc);
+        // Check for timeout before proceeding with state update
+        if (millis() - startTime > STATE_UPDATE_TIMEOUT) {
+            DEBUG_LOG("State update timeout before processing");
+            return;
         }
-        else if (strcmp(topic, Config::MQTT::Topics::NIGHT_MODE) == 0) {
-            handleNightModeMessage(doc);
+
+        // Process message based on determined action
+        switch (action) {
+            case MessageAction::MODE:
+                success = handleModeMessage(doc);
+                needsUpdate = success;
+                break;
+
+            case MessageAction::NIGHT_MODE:
+                success = handleNightModeMessage(doc);
+                needsUpdate = success;
+                break;
+
+            case MessageAction::RECOVERY:
+                success = handleRecoveryMessage(doc);
+                needsUpdate = success;
+                break;
+
+            case MessageAction::NIGHT_SETTINGS:
+                success = handleNightSettingsMessage(doc);
+                needsUpdate = success;
+                break;
+
+            default:
+                DEBUG_LOG("Unhandled message action");
+                break;
         }
-        else if (strcmp(topic, Config::MQTT::Topics::RECOVERY) == 0) {
-            handleRecoveryMessage(doc);
-        }
-        else if (strcmp(topic, Config::MQTT::Topics::NIGHT_SETTINGS) == 0) {
-            handleNightSettingsMessage(doc);
-        }
+    } // End of critical section
+
+    // Final timeout check
+    if (millis() - startTime > STATE_UPDATE_TIMEOUT) {
+        DEBUG_LOG("Message handling exceeded timeout");
+        // Consider rolling back changes if needed
+        return;
     }
 
-    free(payloadCopy);
-    publishStatus();
+    // Publish status update outside of critical section if needed
+    if (needsUpdate) {
+        publishStatus();
+        DEBUG_LOG("Status published after state update");
+    }
+
+    if (!success) {
+        DEBUG_LOG("Message handling failed for topic: %s", topic);
+    }
 }
 
-void MqttManager::handleNightModeMessage(const JsonDocument& doc) {
-    DEBUG_LOG("Processing night mode message: %s", doc.as<String>().c_str());
 
-    // Check if "enabled" exists and is boolean
+// Helper method to determine message action from topic
+MqttManager::MessageAction MqttManager::determineMessageAction(const char* topic) {
+    if (strcmp(topic, Config::MQTT::Topics::MODE_SET) == 0) {
+        return MessageAction::MODE;
+    }
+    else if (strcmp(topic, Config::MQTT::Topics::NIGHT_MODE_SET) == 0) {
+        return MessageAction::NIGHT_MODE;
+    }
+    else if (strcmp(topic, Config::MQTT::Topics::RECOVERY_SET) == 0) {
+        return MessageAction::RECOVERY;
+    }
+    else if (strcmp(topic, Config::MQTT::Topics::NIGHT_SETTINGS_SET) == 0) {
+        return MessageAction::NIGHT_SETTINGS;
+    }
+    return MessageAction::INVALID;
+}
+
+bool MqttManager::handleNightModeMessage(const JsonDocument& doc) {
+    DEBUG_LOG("Processing night mode message");
+
     if (!doc["enabled"].is<bool>()) {
         DEBUG_LOG("Night mode message missing or invalid 'enabled' field");
-        return;
+        return false;
     }
 
     bool enabled = doc["enabled"];
-    DEBUG_LOG("Setting night mode to: %s", enabled ? "enabled" : "disabled");
-    
-    bool result = fanController.setNightMode(enabled);
-    DEBUG_LOG("setNightMode result: %s", result ? "success" : "failed");
+    return fanController.setNightMode(enabled);
 }
 
-void MqttManager::handleRecoveryMessage(const JsonDocument& doc) {
-    DEBUG_LOG("Processing recovery message: %s", doc.as<String>().c_str());
+bool MqttManager::handleRecoveryMessage(const JsonDocument& doc) {
+    DEBUG_LOG("Processing recovery message");
 
     if (!doc["recover"].is<bool>()) {
         DEBUG_LOG("Recovery message missing or invalid 'recover' field");
-        return;
+        return false;
     }
 
     bool shouldRecover = doc["recover"];
-    if (shouldRecover) {
-        bool result = fanController.attemptRecovery();
-        DEBUG_LOG("Recovery attempt result: %s", result ? "success" : "failed");
-    }
+    return shouldRecover ? fanController.attemptRecovery() : false;
 }
 
-void MqttManager::handleModeMessage(const JsonDocument& doc) {
-    DEBUG_LOG("Processing mode message: %s", doc.as<String>().c_str());
+
+bool MqttManager::handleModeMessage(const JsonDocument& doc) {
+    DEBUG_LOG("Processing mode message");
 
     if (!doc["mode"].is<const char*>()) {
         DEBUG_LOG("Mode message missing or invalid 'mode' field");
-        return;
+        return false;
     }
 
     const char* mode = doc["mode"];
     DEBUG_LOG("Setting mode to: %s", mode);
 
     if (strcmp(mode, "auto") == 0) {
-        bool result = fanController.setControlMode(FanController::Mode::AUTO);
-        DEBUG_LOG("Set auto mode result: %s", result ? "success" : "failed");
+        return fanController.setControlMode(FanController::Mode::AUTO);
     }
     else if (strcmp(mode, "manual") == 0) {
         bool modeResult = fanController.setControlMode(FanController::Mode::MANUAL);
-        DEBUG_LOG("Set manual mode result: %s", modeResult ? "success" : "failed");
         
-        // Set speed if provided
+        // Set speed if provided in manual mode
         if (modeResult && doc["speed"].is<int>()) {
             int speed = doc["speed"];
             DEBUG_LOG("Setting manual speed to: %d", speed);
-            bool speedResult = fanController.setSpeedDutyCycle(speed);
-            DEBUG_LOG("Set speed result: %s", speedResult ? "success" : "failed");
+            fanController.setSpeedDutyCycle(speed);
         }
+        return modeResult;
     }
+    return false;
 }
 
-void MqttManager::handleNightSettingsMessage(const JsonDocument& doc) {
-    DEBUG_LOG("Processing night settings message: %s", doc.as<String>().c_str());
+bool MqttManager::handleNightSettingsMessage(const JsonDocument& doc) {
+    DEBUG_LOG("Processing night settings message");
 
     // Validate required fields
     if (!doc["start_hour"].is<int>() || 
         !doc["end_hour"].is<int>() || 
         !doc["max_speed"].is<int>()) {
-        DEBUG_LOG("Night settings message missing or invalid required fields");
-        return;
+        DEBUG_LOG("Night settings message missing required fields");
+        return false;
     }
 
-    // Get and validate values
     int startHour = doc["start_hour"];
     int endHour = doc["end_hour"];
-    int maxPercent = doc["max_speed"];
+    int maxSpeed = doc["max_speed"];
 
+    // Validate ranges
     if (startHour < 0 || startHour > 23 || 
         endHour < 0 || endHour > 23 || 
-        maxPercent < 0 || maxPercent > 100) {
+        maxSpeed < 0 || maxSpeed > 100) {
         DEBUG_LOG("Night settings values out of range");
-        return;
+        return false;
     }
 
-    // Use the percentage directly with the updated FanController method
-    bool result = fanController.setNightSettings(startHour, endHour, maxPercent);
-    
-    DEBUG_LOG("Night settings update - Start: %d, End: %d, MaxSpeed: %d%% (Result: %s)", 
-              startHour, endHour, maxPercent, result ? "success" : "failed");
+    return fanController.setNightSettings(startHour, endHour, maxSpeed);
 }
 
 /*******************************************************************************
@@ -423,48 +498,63 @@ void MqttManager::publishString(const char* topic, const String& value) {
 }
 
 void MqttManager::publishStatus() {
+    if (!mqttClient.connected()) {
+        DEBUG_LOG("Cannot publish status - not connected");
+        return;
+    }
+
     MutexGuard guard(messageMutex);
     if (!guard.isLocked()) {
         DEBUG_LOG("Failed to acquire mutex for status publish");
         return;
     }
 
-    JsonDocument doc;
-    
-    // Populate status document
-    doc["status"] = fanController.getStatus() == FanController::Status::OK ? "ok" : "error";
-    doc["fan_speed"] = fanController.getCurrentSpeed();
-    doc["target_speed"] = fanController.getTargetSpeed();
-    doc["rpm"] = fanController.getMeasuredRPM();
-    doc["mode"] = fanController.getControlMode() == FanController::Mode::AUTO ? "auto" : "manual";
-    doc["temp"] = tempSensor.getSmoothedTemp();
-    doc["night_mode_enabled"] = fanController.isNightModeEnabled();
-    doc["night_mode_active"] = fanController.isNightModeActive();
-    doc["night_start"] = fanController.getNightStartHour();
-    doc["night_end"] = fanController.getNightEndHour();
-    doc["night_max_speed"] = fanController.getNightMaxSpeed();
-
-
-    // Serialize and publish
-    char buffer[512];
-    size_t n = serializeJson(doc, buffer);
-    
-    if (mqttClient.connected()) {
-        bool success = mqttClient.publish(Config::MQTT::Topics::COMMAND, buffer, true);
-        DEBUG_LOG("Status published (success: %d): %s", success, buffer);
-    } else {
-        DEBUG_LOG("Cannot publish status - not connected");
+    // System status document
+    JsonDocument systemDoc;
+    {
+        auto status = fanController.getStatus();
+        systemDoc["state"] = status == FanController::Status::OK ? "on" : "off";
+        systemDoc["speed"] = fanController.getCurrentSpeed();
+        systemDoc["mode"] = fanController.getControlMode() == FanController::Mode::AUTO ? "auto" : "manual";
+        systemDoc["temperature"] = tempSensor.getSmoothedTemp();
+        
+        // Add error information if applicable
+        if (status != FanController::Status::OK) {
+            systemDoc["error"] = getFanStatusString(status);
+        }
     }
+
+    // Night mode status document
+    JsonDocument nightDoc;
+    {
+        nightDoc["enabled"] = fanController.isNightModeEnabled();
+        nightDoc["active"] = fanController.isNightModeActive();
+        nightDoc["start_hour"] = fanController.getNightStartHour();
+        nightDoc["end_hour"] = fanController.getNightEndHour();
+        nightDoc["max_speed"] = fanController.getNightMaxSpeed();
+    }
+
+    // Publish both status documents
+    bool systemPublished = publishJson(Config::MQTT::Topics::SYSTEM_STATUS, systemDoc);
+    bool nightPublished = publishJson(Config::MQTT::Topics::NIGHT_MODE_STATUS, nightDoc);
+
+    DEBUG_LOG("Status published - System: %s, Night Mode: %s",
+              systemPublished ? "success" : "failed",
+              nightPublished ? "success" : "failed");
 }
 
-void MqttManager::publishJson(const char* topic, const JsonDocument& doc) {
-    char buffer[256];
+bool MqttManager::publishJson(const char* topic, const JsonDocument& doc) {
+    if (!mqttClient.connected()) {
+        return false;
+    }
+
+    char buffer[512];  // Increased buffer size for safety
     size_t n = serializeJson(doc, buffer);
     
-    if (mqttClient.connected()) {
-        bool success = mqttClient.publish(topic, buffer);
-        DEBUG_LOG("Published to %s (success: %d): %s", topic, success, buffer);
-    }
+    bool success = mqttClient.publish(topic, buffer, true);  // Set retained flag
+    DEBUG_LOG("Published to %s (%s): %s", topic, success ? "success" : "failed", buffer);
+    
+    return success;
 }
 
 /*******************************************************************************
@@ -478,7 +568,13 @@ void MqttManager::mqttTask(void* parameters) {
     while (true) {
         mqtt->taskManager.updateTaskRunTime("MQTT");
         mqtt->processUpdate();
-        vTaskDelay(pdMS_TO_TICKS(1000)); 
+        
+        // Use shorter delay when messages are being processed
+        if (uxQueueMessagesWaiting(mqtt->messageQueue) > 0) {
+            vTaskDelay(pdMS_TO_TICKS(10));  // Fast response when active
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(50));  // Longer delay when idle
+        }
     }
 }
 
@@ -500,6 +596,19 @@ bool testConnection(const IPAddress& host, uint16_t port, int timeout_ms = 5000)
               
     client.stop();
     return connected;
+}
+
+const char* MqttManager::getFanStatusString(FanController::Status status) {
+    switch (status) {
+        case FanController::Status::OK:
+            return "ok";
+        case FanController::Status::ERROR:
+            return "general_error";
+        case FanController::Status::SHUTOFF:
+            return "fan_stalled";
+        default:
+            return "unknown_error";
+    }
 }
 
 String MqttManager::getMQTTStateString(int state) {

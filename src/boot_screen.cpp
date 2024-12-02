@@ -43,7 +43,7 @@ void BootScreen::createUI() {
 
     createMainScreen();
     
-    // Margins and spacing calculations remain unchanged
+    // Margins and spacing calculations
     uint16_t marginX = displayWidth * 0.05;
     uint16_t titleHeight = displayHeight * 0.15;
     uint16_t lineSpacing = displayHeight * 0.03;
@@ -66,7 +66,7 @@ void BootScreen::createUI() {
     lv_obj_set_style_line_color(topLine, lv_color_hex(DisplayColors::BORDER), LV_PART_MAIN);
     lv_obj_set_style_line_width(topLine, displayHeight * 0.005, LV_PART_MAIN);
     
-    // Rest of layout calculations remain unchanged
+    // Rest of layout calculations
     uint16_t topPadding = displayHeight * 0.08;
     uint16_t bottomPadding = displayHeight * 0.08;
     uint16_t contentStartY = titleHeight + topPadding;
@@ -196,10 +196,10 @@ void BootScreen::createStatusSection(const char* title, uint16_t yOffset,
                                    lv_obj_t** statusLabel, lv_obj_t** detailLabel) {
     // Container dimensions
     uint16_t containerWidth = displayWidth * 0.9;
-    uint16_t containerHeight = displayHeight * 0.18;  // Fixed proportion of display height
+    uint16_t containerHeight = displayHeight * 0.2;  // Fixed proportion of display height
     
     // Calculate padding and spacing
-    uint16_t padding = containerHeight * 0.15;        // 15% of container height for padding
+    uint16_t padding = containerHeight * 0.1;        // 10% of container height for padding
     
     // Create container
     lv_obj_t* cont = lv_obj_create(screen);
@@ -229,9 +229,9 @@ void BootScreen::createStatusSection(const char* title, uint16_t yOffset,
     lv_label_set_text(*statusLabel, title);
     
     // Select font size based on container height
-    const lv_font_t* statusFont = (containerHeight >= 100) ? &lv_font_montserrat_16 :
-                                 (containerHeight >= 80)  ? &lv_font_montserrat_14 :
-                                                          &lv_font_montserrat_12;
+    const lv_font_t* statusFont = (containerHeight >= 100) ? &lv_font_montserrat_14 :
+                                 (containerHeight >= 80)  ? &lv_font_montserrat_12 :
+                                                          &lv_font_montserrat_10;
     lv_obj_set_style_text_font(*statusLabel, statusFont, LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(*statusLabel, lv_color_hex(DisplayColors::TEXT_PRIMARY), LV_STATE_DEFAULT);
     
@@ -245,9 +245,9 @@ void BootScreen::createStatusSection(const char* title, uint16_t yOffset,
     lv_label_set_text(*detailLabel, "Pending...");
     
     // Select smaller font for detail text
-    const lv_font_t* detailFont = (containerHeight >= 100) ? &lv_font_montserrat_14 :
-                                 (containerHeight >= 80)  ? &lv_font_montserrat_12 :
-                                                          &lv_font_montserrat_10;
+    const lv_font_t* detailFont = (containerHeight >= 100) ? &lv_font_montserrat_12 :
+                                 (containerHeight >= 80)  ? &lv_font_montserrat_10 :
+                                                          &lv_font_montserrat_8;
     lv_obj_set_style_text_font(*detailLabel, detailFont, LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(*detailLabel, lv_color_hex(DisplayColors::TEXT_SECONDARY), LV_STATE_DEFAULT);
     

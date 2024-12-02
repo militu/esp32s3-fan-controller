@@ -1,16 +1,16 @@
 /*******************************************************************************
  * Size: 24 px
  * Bpp: 4
- * Opts: --bpp 4 --size 24 --no-compress --font fa-solid-900.ttf --range 62745 --format lvgl -o fa_tower_broadcast.c
+ * Opts: --bpp 4 --size 24 --no-compress --font fa-solid-900.ttf --range 62745 --format lvgl -o fa_tower_broadcast_24.c
  ******************************************************************************/
 
 #include "lvgl.h"
 
-#ifndef FA_TOWER_BROADCAST
-#define FA_TOWER_BROADCAST 1
+#ifndef FA_TOWER_BROADCAST_24
+#define FA_TOWER_BROADCAST_24 1
 #endif
 
-#if FA_TOWER_BROADCAST
+#if FA_TOWER_BROADCAST_24
 
 /*-----------------
  *    BITMAPS
@@ -127,9 +127,9 @@ static lv_font_fmt_txt_dsc_t font_dsc = {
 
 /*Initialize a public general font descriptor*/
 #if LVGL_VERSION_MAJOR >= 8
-const lv_font_t fa_tower_broadcast = {
+const lv_font_t fa_tower_broadcast_24 = {
 #else
-lv_font_t fa_tower_broadcast = {
+lv_font_t fa_tower_broadcast_24 = {
 #endif
     .get_glyph_dsc = lv_font_get_glyph_dsc_fmt_txt,    /*Function pointer to get glyph's data*/
     .get_glyph_bitmap = lv_font_get_bitmap_fmt_txt,    /*Function pointer to get glyph's bitmap*/
@@ -151,5 +151,5 @@ lv_font_t fa_tower_broadcast = {
 
 
 
-#endif /*#if FA_TOWER_BROADCAST*/
+#endif /*#if FA_TOWER_BROADCAST_24*/
 
