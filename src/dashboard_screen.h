@@ -52,6 +52,7 @@ private:
     lv_meter_indicator_t* temperatureIndicator;
     lv_obj_t* speedMeter;
     lv_obj_t* tempMeter;
+    lv_obj_t* arcTempMeter;
     lv_meter_indicator_t* targetSpeedIndicator;
     lv_meter_indicator_t* currentSpeedIndicator;
     lv_obj_t* speedLabel;
@@ -70,10 +71,9 @@ private:
     // Layout construction methods
     void createMainScreen();
     void createTopStatusBar(uint16_t height);
-    void createDelimiter(uint16_t topOffset, uint16_t height);
     void createMainContent(uint16_t startY, uint16_t height);
-    void createSpeedMeter(uint16_t size, uint16_t xPos, uint16_t yPos);
-    void createTemperatureMeter(uint16_t size, uint16_t xPos);
+    void createSpeedMeter(uint16_t size, uint16_t xPosFromRight);
+    void createTemperatureMeter(uint16_t size, uint16_t xPosFromLeft);
 
     // UI Helper methods
     lv_obj_t* createStatusLabel(lv_obj_t* parent, lv_align_t align, 
@@ -107,6 +107,11 @@ private:
         bool nightModeActive = false;
     };
     StatusState lastStatus;
+
+    // Utilities
+    void addDebugPoint(lv_obj_t* parent, lv_coord_t x, lv_coord_t y, lv_color_t color);
+    void addDebugPoints(lv_obj_t* meter_container, uint16_t size);
+
 };
 
 #endif // DASHBOARD_SCREEN_H

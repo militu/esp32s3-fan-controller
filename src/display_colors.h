@@ -12,11 +12,14 @@ namespace DisplayColors {
     static constexpr uint32_t BORDER = 0x475569;      // Medium slate - subtle but visible
     static constexpr uint32_t TEXT_PRIMARY = 0xF8FAFC; // Off-white - easier on the eyes
     static constexpr uint32_t TEXT_SECONDARY = 0x94A3B8; // Cool gray - better contrast
+    static constexpr uint32_t METER = 0x2D3B4C; // Even Lighter navy - subtle gradient
+
     
     // Background Colors
     static constexpr uint32_t BG_DARK = 0x0F172A;     // Deep navy - rich background
     static constexpr uint32_t BG_LIGHT = 0x1E293B;    // Lighter navy - subtle gradient
-    
+    static constexpr uint32_t BG_TOPBAR = 0x050709;    // Darker navy
+
     // Temperature Colors
     static constexpr uint32_t TEMP_GOOD = 0x34D399;   // Emerald green - professional
     static constexpr uint32_t TEMP_WARNING = 0xFBAF24; // Warm amber - clear warning
