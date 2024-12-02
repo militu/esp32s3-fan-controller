@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <cstdint>
 
-#define MQTT_BASE_TOPIC "fan_controller_amadeusmilitu_128932"
+#define MQTT_BASE_TOPIC "fan_controller_esp_32"
 #define MQTT_TOPIC(suffix) MQTT_BASE_TOPIC "/" suffix
 
 namespace Config {

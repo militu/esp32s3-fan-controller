@@ -204,7 +204,7 @@ void DashboardScreen::createTemperatureMeter(uint16_t size, uint16_t xPos) {
     
     // Configure scale
     lv_meter_set_scale_ticks(tempMeter, scale, 41, 2, 10, lv_color_hex(DisplayColors::BORDER));
-    lv_meter_set_scale_major_ticks(tempMeter, scale, 8, 4, 15, lv_color_hex(DisplayColors::TEXT_PRIMARY), 10);
+    lv_meter_set_scale_major_ticks(tempMeter, scale, 8, 4, size * 0.12, lv_color_hex(DisplayColors::TEXT_PRIMARY), 10);
     lv_meter_set_scale_range(tempMeter, scale, 0, 100, 270, 135); // Match original arc's angle range
 
     // Add indicators
@@ -251,8 +251,8 @@ void DashboardScreen::createSpeedMeter(uint16_t size, uint16_t xPos, uint16_t yP
     // Add scale for speed
     lv_meter_scale_t* scale = lv_meter_add_scale(speedMeter);
     lv_meter_set_scale_ticks(speedMeter, scale, 41, 2, 10, lv_color_hex(DisplayColors::BORDER));
-    lv_meter_set_scale_major_ticks(speedMeter, scale, 8, 4, 15, lv_color_hex(DisplayColors::TEXT_PRIMARY), 10);
-    lv_meter_set_scale_range(speedMeter, scale, 0, 100, 270, 180);
+    lv_meter_set_scale_major_ticks(speedMeter, scale, 8, 4, size * 0.12, lv_color_hex(DisplayColors::TEXT_PRIMARY), 10);
+    lv_meter_set_scale_range(speedMeter, scale, 0, 100, 270, 135);
     
     // Add target speed arc
     targetSpeedIndicator = lv_meter_add_arc(speedMeter, scale, size * 0.05, lv_color_hex(DisplayColors::TARGET_SPEED), 0);
@@ -319,9 +319,21 @@ void DashboardScreen::updateTemperatureDisplay(float temp) {
         currentTempValue = targetValue;
     }
 
+    // Update the temp label
     char tempStr[32];
+    
+    lv_color_t tempColor;
+    if (temp < 30.0f) {
+        tempColor = lv_color_hex(DisplayColors::TEMP_GOOD);
+    } else if (temp < 60.0f) {
+        tempColor = lv_color_hex(DisplayColors::TEMP_WARNING);
+    } else {
+        tempColor = lv_color_hex(DisplayColors::TEMP_CRITICAL);
+    }
+    
     snprintf(tempStr, sizeof(tempStr), "%.1f°C", temp);
     lv_label_set_text(tempLabel, tempStr);
+    lv_obj_set_style_text_color(tempLabel, tempColor, LV_STATE_DEFAULT);
 }
 
 void DashboardScreen::updateStatusIndicators(bool wifiConnected, bool mqttConnected, 
@@ -392,8 +404,18 @@ void DashboardScreen::updateSpeedDisplay(int fanSpeed, int targetSpeed) {
 
     // Update the speed label
     char speedStr[32];
+    lv_color_t speedColor;
+    if (fanSpeed < 30) {
+        speedColor = lv_color_hex(DisplayColors::SPEED_GOOD);
+    } else if (fanSpeed < 60) {
+        speedColor = lv_color_hex(DisplayColors::SPEED_WARNING);
+    } else {
+        speedColor = lv_color_hex(DisplayColors::SPEED_CRITICAL);
+    }
+
     snprintf(speedStr, sizeof(speedStr), "%d%%", fanSpeed);
     lv_label_set_text(speedLabel, speedStr);
+    lv_obj_set_style_text_color(speedLabel, speedColor, LV_STATE_DEFAULT);
 }
 
 void DashboardScreen::updateModeDisplay(FanController::Mode mode) {

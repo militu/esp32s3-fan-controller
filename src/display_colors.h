@@ -21,11 +21,13 @@ namespace DisplayColors {
     static constexpr uint32_t TEMP_GOOD = 0x34D399;   // Emerald green - professional
     static constexpr uint32_t TEMP_WARNING = 0xFBAF24; // Warm amber - clear warning
     static constexpr uint32_t TEMP_CRITICAL = 0xEF4444; // New red - serious but not harsh
-    static constexpr uint32_t KNOB = 0x334155;        // Matching slate for consistency
 
     // Speed Colors
     static constexpr uint32_t CURRENT_SPEED = 0x34D399;   // Emerald green - professional
     static constexpr uint32_t TARGET_SPEED = 0xFBAF24; // Warm amber - clear warning
+    static constexpr uint32_t SPEED_GOOD = 0x34D399;   // Emerald green - professional
+    static constexpr uint32_t SPEED_WARNING = 0xFBAF24; // Warm amber - clear warning
+    static constexpr uint32_t SPEED_CRITICAL = 0xEF4444; // New red - serious but not harsh
 }
 
 #endif // DISPLAY_COLORS_H
