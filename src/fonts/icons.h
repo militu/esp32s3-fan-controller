@@ -14,6 +14,7 @@ LV_FONT_DECLARE(fa_moon_12);
 LV_FONT_DECLARE(fa_tower_broadcast_24);
 LV_FONT_DECLARE(fa_tower_broadcast_16);
 LV_FONT_DECLARE(fa_tower_broadcast_12);
+LV_IMG_DECLARE( ui_img_gradient_225_170px_png);
 
 #ifdef __cplusplus
 }
