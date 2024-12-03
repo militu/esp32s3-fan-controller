@@ -49,3 +49,9 @@ temp/
 .idea/
 *.swp
 *.swo
+
+# Secrets file
+secrets.h
+
+# A template file that can be committed
+!secrets.template.h

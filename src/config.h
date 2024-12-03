@@ -3,8 +3,9 @@
 
 #include <Arduino.h>
 #include <cstdint>
+#include "secrets.h"
 
-#define MQTT_BASE_TOPIC "fan_controller_esp_32"
+#define MQTT_BASE_TOPIC "fan_controller"
 #define MQTT_TOPIC(suffix) MQTT_BASE_TOPIC "/" suffix
 
 namespace Config {
@@ -41,8 +42,8 @@ namespace Config {
      * @brief WiFi connection configuration
      */
     namespace WiFi {
-        constexpr char SSID[] = "Wokwi-GUEST";
-        constexpr char PASSWORD[] = "";
+        using Secrets::WiFi::SSID;
+        using Secrets::WiFi::PASSWORD;
         constexpr uint8_t MAX_RETRIES = 3;
         constexpr uint32_t CONNECTION_CHECK_INTERVAL_MS = 60000;    // 1 minute
         constexpr uint32_t RETRY_DELAY_MS = 3000;        // 3 seconds
@@ -154,9 +155,11 @@ namespace Config {
      * @brief MQTT communication configuration
      */
     namespace MQTT {
-        constexpr char SERVER[] = "test.mosquitto.org";
-        constexpr uint16_t PORT = 1883;
-        constexpr char CLIENT_ID[] = "esp32_fan_controller";
+        using Secrets::MQTT::SERVER;
+        using Secrets::MQTT::PORT;
+        using Secrets::MQTT::CLIENT_ID;
+        using Secrets::MQTT::USERNAME;
+        using Secrets::MQTT::PASSWORD;
         constexpr uint32_t RECONNECT_DELAY_MS = 5000;
         constexpr uint32_t UPDATE_INTERVAL = 10000;
         constexpr uint8_t MAX_RETRIES = 3;

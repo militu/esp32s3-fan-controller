@@ -124,7 +124,7 @@ void MqttManager::connect() {
 
     String clientId = String(Config::MQTT::CLIENT_ID) + String(random(0xffff), HEX);
 
-    if (mqttClient.connect(clientId.c_str(), nullptr, nullptr, 
+    if (mqttClient.connect(clientId.c_str(), Config::MQTT::USERNAME, Config::MQTT::PASSWORD, 
                           Config::MQTT::Topics::AVAILABILITY,
                           0, true, "offline")) {
         DEBUG_LOG("MQTT Connected Successfully!");
