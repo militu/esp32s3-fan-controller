@@ -19,8 +19,6 @@ DisplayManager::DisplayManager(TaskManager& tm, TempSensor& ts, FanController& f
 {
 }
 
-// In display_manager.cpp
-// In display_manager.cpp
 bool DisplayManager::begin(DisplayDriver* displayDriver) {
     DEBUG_LOG_DISPLAY("DisplayManager: Starting initialization");
 
@@ -36,8 +34,8 @@ bool DisplayManager::begin(DisplayDriver* displayDriver) {
     }
 
     // Create queue first
-    uiCommandQueue = xQueueCreate(QUEUE_SIZE, sizeof(UICommand));
-    if (!uiCommandQueue) {
+    DisplayUpdateCommandQueue = xQueueCreate(Config::Display::DisplayUpdate::Queue::SIZE, sizeof(DisplayUpdateCommand));
+    if (!DisplayUpdateCommandQueue) {
         DEBUG_LOG_DISPLAY("DisplayManager: Queue creation failed");
         return false;
     }
@@ -83,29 +81,29 @@ bool DisplayManager::begin(DisplayDriver* displayDriver) {
     bootUI.begin();
 
     // Create LVGL task with adjusted parameters
-    TaskManager::TaskConfig lvglConfig{
-        "LVGL",
-        LVGL_STACK_SIZE,
-        LVGL_TASK_PRIORITY,
-        LVGL_TASK_CORE
+    TaskManager::TaskConfig renderConfig{
+        "DisplayRender",
+        Config::Display::DisplayRender::STACK_SIZE,
+        Config::Display::DisplayRender::TASK_PRIORITY,
+        Config::Display::DisplayRender::TASK_CORE
     };
     
-    esp_err_t err = taskManager.createTask(lvglConfig, lvglTask, this);
+    esp_err_t err = taskManager.createTask(renderConfig, displayRenderTask, this);
     if (err != ESP_OK) {
-        DEBUG_LOG_DISPLAY("DisplayManager: LVGL task creation failed with error %d", err);
+        DEBUG_LOG_DISPLAY("DisplayManager: DisplayRender task creation failed with error %d", err);
         return false;
     }
 
-    TaskManager::TaskConfig uiUpdateConfig{
-        "UI_Updates",
-        UI_UPDATE_STACK_SIZE,
-        UI_UPDATE_TASK_PRIORITY,
-        UI_UPDATE_TASK_CORE
+    TaskManager::TaskConfig updateConfig{
+        "DisplayUpdate",
+        Config::Display::DisplayUpdate::STACK_SIZE,
+        Config::Display::DisplayUpdate::TASK_PRIORITY,
+        Config::Display::DisplayUpdate::TASK_CORE
     };
     
-    err = taskManager.createTask(uiUpdateConfig, uiUpdateTask, this);
+    err = taskManager.createTask(updateConfig, displayUpdateTask, this);
     if (err != ESP_OK) {
-        DEBUG_LOG_DISPLAY("DisplayManager: UI task creation failed with error %d", err);
+        DEBUG_LOG_DISPLAY("DisplayManager: DisplayUpdate task creation failed with error %d", err);
         return false;
     }
 
@@ -119,18 +117,18 @@ void DisplayManager::initializeBootScreen() {
     lv_scr_load(bootUI.getScreen());
 }
 
-void DisplayManager::lvglTask(void* parameters) {
+void DisplayManager::displayRenderTask(void* parameters) {
     DisplayManager* display = static_cast<DisplayManager*>(parameters);
-    display->processLVGL();
+    display->processDisplayRender();
 }
 
-void DisplayManager::uiUpdateTask(void* parameters) {
+void DisplayManager::displayUpdateTask(void* parameters) {
     DisplayManager* display = static_cast<DisplayManager*>(parameters);
-    display->processUIUpdates();
+    display->processDisplayUpdates();
 }
 
 
-void DisplayManager::processLVGL() {
+void DisplayManager::processDisplayRender() {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     
     while (true) {
@@ -145,9 +143,9 @@ void DisplayManager::processLVGL() {
     }
 }
 
-void DisplayManager::processUIUpdates() {
+void DisplayManager::processDisplayUpdates() {
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    UICommand cmd;
+    DisplayUpdateCommand cmd;
     
     while (true) {
         // Handle screen transition if needed
@@ -165,7 +163,7 @@ void DisplayManager::processUIUpdates() {
                 
             case DisplayState::DASHBOARD:
                 // Process any pending UI commands
-                while (xQueueReceive(uiCommandQueue, &cmd, 0) == pdTRUE) {
+                while (xQueueReceive(DisplayUpdateCommandQueue, &cmd, 0) == pdTRUE) {
                     dashboardUI.update(
                         cmd.temperature,
                         cmd.currentSpeed,
@@ -181,14 +179,14 @@ void DisplayManager::processUIUpdates() {
                 // Regular display updates
                 static uint32_t last_update = 0;
                 uint32_t now = millis();
-                if (now - last_update >= UPDATE_INTERVAL) {
+                if (now - last_update >= Config::Display::DisplayRender::UPDATE_INTERVAL) {
                     updateDashboardValues();
                     last_update = now;
                 }
                 break;
         }
         
-        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(LVGL_TASK_DELAY));
+        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(Config::Display::DisplayRender::TASK_DELAY));
     }
 }
 
@@ -237,7 +235,7 @@ void DisplayManager::updateDashboardValues() {
     if (!initialized) return;
 
     // Create a command with current state
-    UICommand cmd(
+    DisplayUpdateCommand cmd(
         tempSensor.getSmoothedTemp(),
         fanController.getCurrentSpeed(),
         fanController.getTargetSpeed(),
@@ -250,7 +248,7 @@ void DisplayManager::updateDashboardValues() {
 
     // Send to queue, with a short timeout
     // We use a timeout of 0 to prevent blocking if queue is full
-    if (xQueueSend(uiCommandQueue, &cmd, 0) != pdTRUE) {
+    if (xQueueSend(DisplayUpdateCommandQueue, &cmd, 0) != pdTRUE) {
         // Optional: Add error handling if queue is full
         // For now, we'll just skip this update
     }

@@ -48,7 +48,10 @@ esp_err_t WifiManager::begin() {
     delay(100);
 
     // Create background task for WiFi management
-    TaskManager::TaskConfig taskConfig("WiFi", WIFI_STACK_SIZE, WIFI_TASK_PRIORITY, WIFI_TASK_CORE);
+    TaskManager::TaskConfig taskConfig("WiFi", 
+                                       Config::WiFi::Task::STACK_SIZE, 
+                                       Config::WiFi::Task::TASK_PRIORITY, 
+                                       Config::WiFi::Task::TASK_CORE);
     esp_err_t err = taskManager.createTask(taskConfig, wifiTask, this);
     
     if (err != ESP_OK) {
@@ -70,7 +73,7 @@ esp_err_t WifiManager::connect() {
     
     currentState = Config::System::State::WIFI_CONNECTING;
     connectionAttempts = 0;
-    currentRetryDelay = Config::WiFi::RETRY_DELAY;
+    currentRetryDelay = Config::WiFi::RETRY_DELAY_MS;
     lastAttemptTime = 0;
     attemptInProgress = false;
     
@@ -116,7 +119,7 @@ void WifiManager::processUpdate() {
                 wasConnected = true;
                 attemptInProgress = false;
                 DEBUG_LOG("WiFi connected! IP: %s", WiFi.localIP().toString().c_str());
-            } else if (currentTime - lastAttemptTime >= Config::WiFi::RETRY_DELAY) {
+            } else if (currentTime - lastAttemptTime >= Config::WiFi::RETRY_DELAY_MS) {
                 // Attempt timed out
                 attemptInProgress = false;
                 currentRetryDelay *= Config::WiFi::BACKOFF_FACTOR;
@@ -127,7 +130,7 @@ void WifiManager::processUpdate() {
     }
     
     // Periodic connection check
-    if (currentTime - lastCheckTime >= Config::WiFi::CHECK_INTERVAL) {
+    if (currentTime - lastCheckTime >= Config::WiFi::CONNECTION_CHECK_INTERVAL_MS) {
         lastCheckTime = currentTime;
         if (WiFi.status() != WL_CONNECTED && currentState != Config::System::State::WIFI_CONNECTING) {
             DEBUG_LOG("WiFi connection lost. Reconnecting...");
@@ -189,7 +192,7 @@ void WifiManager::wifiTask(void* parameters) {
 
 uint32_t WifiManager::getTotalTimeout() {
   // Get the base retry delay from configuration
-  uint32_t baseDelay = Config::WiFi::RETRY_DELAY;
+  uint32_t baseDelay = Config::WiFi::RETRY_DELAY_MS;
 
   // Calculate total timeout based on the backoff strategy
   uint32_t totalTimeout = 0;

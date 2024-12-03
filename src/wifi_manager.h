@@ -60,12 +60,7 @@ public:
 
     uint32_t getTotalTimeout();
 
-private:
-    // Task configuration constants
-    static constexpr uint32_t WIFI_STACK_SIZE = 4096;
-    static constexpr UBaseType_t WIFI_TASK_PRIORITY = 2;
-    static constexpr BaseType_t WIFI_TASK_CORE = 0;
-    
+private:    
     // Core components
     TaskManager& taskManager;
     SemaphoreHandle_t mutex;

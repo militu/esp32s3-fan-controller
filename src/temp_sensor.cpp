@@ -61,7 +61,10 @@ esp_err_t TempSensor::begin() {
     }
 
     // Create temperature monitoring task
-    TaskManager::TaskConfig taskConfig("Temp", TEMP_STACK_SIZE, TEMP_TASK_PRIORITY, TEMP_TASK_CORE);
+    TaskManager::TaskConfig taskConfig("Temp", 
+                                       Config::Temperature::Task::STACK_SIZE, 
+                                       Config::Temperature::Task::TASK_PRIORITY, 
+                                       Config::Temperature::Task::TASK_CORE);
     esp_err_t err = taskManager.createTask(taskConfig, tempTask, this);
     
     if (err != ESP_OK) {
@@ -262,7 +265,7 @@ void TempSensor::tempTask(void* parameters) {
                 temp->processReading();
                 conversionInProgress = false;
                 // Wait remainder of the interval
-                vTaskDelay(pdMS_TO_TICKS(Config::Temperature::READ_INTERVAL - 800));
+                vTaskDelay(pdMS_TO_TICKS(Config::Temperature::READ_INTERVAL_MS - 800));
                 continue;
             }
         }

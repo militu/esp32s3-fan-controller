@@ -47,8 +47,8 @@ public:
      * @brief Configuration parameters for fan operation
      */
     struct FanConfig {
-        float minTemp;          ///< Minimum temperature for auto mode
-        float maxTemp;          ///< Maximum temperature for auto mode
+        float minTriggerTemp;          ///< Minimum trigger temperature for auto mode
+        float maxTriggerTemp;          ///< Maximum trigger temperature for auto mode
         uint8_t minSpeed;       ///< Minimum speed percentage
         uint8_t maxSpeed;       ///< Maximum speed percentage
         uint8_t minPWM;        ///< Minimum PWM value
@@ -120,14 +120,6 @@ public:
     void loadSettings(ConfigPreference& configPref);
 
 private:
-    // Constants
-    static constexpr uint32_t TASK_STACK_SIZE = 4096;
-    static constexpr UBaseType_t TASK_PRIORITY = 3;
-    static constexpr BaseType_t TASK_CORE = 1;
-    static constexpr uint32_t MUTEX_TIMEOUT_MS = 1000;
-    static constexpr uint8_t STALL_RETRY_COUNT = 3;
-    static constexpr uint32_t EVENT_CHECK_INTERVAL = 1000;
-
     // Core components
     TaskManager& taskManager;
     SemaphoreHandle_t mutex;

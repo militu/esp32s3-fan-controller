@@ -3,8 +3,6 @@
  * @brief Implementation of the TaskManager class for FreeRTOS task management
  */
 
-#define DEBUG_LOG_TM(msg, ...) if (Config::System::Debug::TM) { Serial.printf(msg "\n", ##__VA_ARGS__); }
-
 #include "task_manager.h"
 
 /*******************************************************************************
@@ -46,7 +44,7 @@ void TaskManager::stop() {
 
     if (xSemaphoreTake(mutex, portMAX_DELAY) == pdTRUE) {
         // Clean up all active tasks
-        for (size_t i = 0; i < MAX_TASKS; i++) {
+        for (size_t i = 0; i < Config::TaskManager::MAX_TASKS; i++) {
             if (tasks[i].active && tasks[i].handle) {
                 vTaskDelete(tasks[i].handle);
                 tasks[i].active = false;
@@ -76,7 +74,7 @@ esp_err_t TaskManager::createTask(const TaskConfig& config, TaskFunction_t funct
 
     // Find available task slot
     int taskIndex = -1;
-    for (size_t i = 0; i < MAX_TASKS; i++) {
+    for (size_t i = 0; i < Config::TaskManager::MAX_TASKS; i++) {
         if (!tasks[i].active) {
             taskIndex = i;
             break;
@@ -178,7 +176,7 @@ bool TaskManager::checkTaskHealth() {
     }
 
     bool allHealthy = true;
-    for (size_t i = 0; i < MAX_TASKS; i++) {
+    for (size_t i = 0; i < Config::TaskManager::MAX_TASKS; i++) {
         if (tasks[i].active) {
             updateTaskHealth(i);
             if (!tasks[i].health.healthy) {
@@ -226,31 +224,31 @@ void TaskManager::updateTaskHealth(size_t taskIndex) {
 
 void TaskManager::dumpTaskStatus() {
     if (!initialized || !mutex) {
-        DEBUG_LOG_TM("Task Manager not initialized!");
+        DEBUG_LOG_TASK_MANAGER("Task Manager not initialized!");
         return;
     }
 
     if (xSemaphoreTake(mutex, portMAX_DELAY) != pdTRUE) {
-        DEBUG_LOG_TM("Failed to take mutex in dumpTaskStatus!");
+        DEBUG_LOG_TASK_MANAGER("Failed to take mutex in dumpTaskStatus!");
         return;
     }
 
-    DEBUG_LOG_TM("\n=== Task Status Dump ===");
+    DEBUG_LOG_TASK_MANAGER("\n=== Task Status Dump ===");
     
-    for (size_t i = 0; i < MAX_TASKS; i++) {
+    for (size_t i = 0; i < Config::TaskManager::MAX_TASKS; i++) {
         if (tasks[i].active && tasks[i].handle) {
-            DEBUG_LOG_TM("\nTask: %s\n", tasks[i].config.name);
-            DEBUG_LOG_TM("State: %d\n", eTaskGetState(tasks[i].handle));
-            DEBUG_LOG_TM("Priority: %d\n", tasks[i].config.priority);
-            DEBUG_LOG_TM("Stack High Water: %d\n", tasks[i].health.stackHighWaterMark);
-            DEBUG_LOG_TM("Last Run: %lu ms ago\n", millis() - tasks[i].health.lastRunTime);
-            DEBUG_LOG_TM("Missed Deadlines: %lu\n", tasks[i].health.missedDeadlines);
-            DEBUG_LOG_TM("Consecutive Failures: %lu\n", tasks[i].health.consecutiveFailures);
-            DEBUG_LOG_TM("Health: %s\n", tasks[i].health.healthy ? "HEALTHY" : "UNHEALTHY");
+            DEBUG_LOG_TASK_MANAGER("\nTask: %s\n", tasks[i].config.name);
+            DEBUG_LOG_TASK_MANAGER("State: %d\n", eTaskGetState(tasks[i].handle));
+            DEBUG_LOG_TASK_MANAGER("Priority: %d\n", tasks[i].config.priority);
+            DEBUG_LOG_TASK_MANAGER("Stack High Water: %d\n", tasks[i].health.stackHighWaterMark);
+            DEBUG_LOG_TASK_MANAGER("Last Run: %lu ms ago\n", millis() - tasks[i].health.lastRunTime);
+            DEBUG_LOG_TASK_MANAGER("Missed Deadlines: %lu\n", tasks[i].health.missedDeadlines);
+            DEBUG_LOG_TASK_MANAGER("Consecutive Failures: %lu\n", tasks[i].health.consecutiveFailures);
+            DEBUG_LOG_TASK_MANAGER("Health: %s\n", tasks[i].health.healthy ? "HEALTHY" : "UNHEALTHY");
         }
     }
     
-    DEBUG_LOG_TM("\n=== End Task Status ===\n");
+    DEBUG_LOG_TASK_MANAGER("\n=== End Task Status ===\n");
     
     xSemaphoreGive(mutex);
 }
@@ -271,7 +269,7 @@ void TaskManager::updateTaskRunTime(const char* taskName) {
  ******************************************************************************/
 
 int TaskManager::findTaskIndex(const char* taskName) const {
-    for (size_t i = 0; i < MAX_TASKS; i++) {
+    for (size_t i = 0; i < Config::TaskManager::MAX_TASKS; i++) {
         if (tasks[i].active && strcmp(tasks[i].config.name, taskName) == 0) {
             return i;
         }
@@ -280,7 +278,7 @@ int TaskManager::findTaskIndex(const char* taskName) const {
 }
 
 void TaskManager::resetTaskHealth(size_t taskIndex) {
-    if (taskIndex < MAX_TASKS) {
+    if (taskIndex < Config::TaskManager::MAX_TASKS) {
         tasks[taskIndex].health = TaskHealth();
     }
 }

@@ -51,8 +51,8 @@ void DashboardScreen::begin() {
     createMainScreen();
     
     // Calculate base dimensions and spacing
-    uint16_t margin = displayWidth * 0.02;
-    uint16_t topBarHeight = displayHeight * 0.18;
+    uint16_t margin = displayWidth * Config::Display::Dashboard::MARGIN_TO_WIDTH_RATIO;
+    uint16_t topBarHeight = displayHeight * Config::Display::Dashboard::TopBar::HEIGHT_TO_SCREEN_RATIO;
     
     // Create all UI elements
     createTopStatusBar(topBarHeight);
@@ -112,8 +112,8 @@ void DashboardScreen::createTopStatusBar(uint16_t height) {
     lv_obj_set_style_radius(topBar, 0, LV_STATE_DEFAULT);
 
     // Calculate margins and spacing
-    uint16_t sideMargin = displayWidth * 0.01;
-    uint16_t iconSpacing = displayWidth * 0.1;
+    uint16_t sideMargin = displayWidth * Config::Display::Dashboard::TopBar::SIDE_PADDING_RATIO;
+    uint16_t iconSpacing = displayWidth * Config::Display::Dashboard::TopBar::ICON_GAP_RATIO;
 
     // Create status indicators with larger font
     const lv_font_t* iconFont = &lv_font_montserrat_16;
@@ -144,7 +144,7 @@ void DashboardScreen::createMainScreen() {
 
 void DashboardScreen::createMainContent(uint16_t startY, uint16_t height) {
     // Calculate optimal dimensions
-    uint16_t meterSize = displayWidth * 0.43;
+    uint16_t meterSize = displayWidth * Config::Display::Dashboard::Meters::METER_SIZE_RATIO;
     // Calculate total remaining space
     uint16_t remainingSpace = displayWidth - (meterSize * 2);
     // Divide it into thirds
@@ -170,14 +170,14 @@ void DashboardScreen::createTemperatureMeter(uint16_t size, uint16_t xPosFromLef
     lv_obj_set_size(meter_container, size, size);
     lv_obj_set_style_bg_opa(meter_container, LV_OPA_0, LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(meter_container, 0, LV_STATE_DEFAULT);
-    lv_obj_set_style_radius(meter_container, size * 0.55, LV_STATE_DEFAULT);
     lv_obj_set_style_pad_all(meter_container, 0, LV_STATE_DEFAULT);
     
     // Center the container
-    lv_obj_align(meter_container, LV_ALIGN_BOTTOM_LEFT, xPosFromLeft, size * 0.08);
+    lv_obj_align(meter_container, LV_ALIGN_BOTTOM_LEFT, xPosFromLeft, size * Config::Display::Dashboard::Meters::BOTTOM_OFFSET_RATIO);
     lv_obj_update_layout(meter_container);
     
-    uint16_t widget_size = size * 0.98;
+    uint16_t widget_size = size * Config::Display::Dashboard::Meters::WIDGET_TO_CONTAINER_RATIO;
+
     // Create and setup temperature meter
     tempMeter = lv_meter_create(meter_container);
     // Remove default styles
@@ -190,20 +190,29 @@ void DashboardScreen::createTemperatureMeter(uint16_t size, uint16_t xPosFromLef
     lv_obj_set_style_bg_opa(tempMeter, LV_OPA_0, LV_PART_MAIN);
     lv_obj_set_user_data(meter_container, this);
 
-
     // Add and configure scale with updated colors
     lv_meter_scale_t* scale = lv_meter_add_scale(tempMeter);
     
-    lv_meter_set_scale_ticks(tempMeter, scale, 41, 2, 10, 
+    // Configure meter scale
+    lv_meter_set_scale_ticks(tempMeter, scale, 51, 2, 10,      // 50 divisions = 1°C per minor tick
                             lv_color_hex(DisplayColors::METER));
-    lv_meter_set_scale_major_ticks(tempMeter, scale, 8, 4, widget_size * 0.12, 
-                                  lv_color_hex(DisplayColors::METER), 10);
+    lv_meter_set_scale_major_ticks(tempMeter, scale, 10, 4,    // Every 10th tick = 10°C intervals
+                                widget_size * Config::Display::Dashboard::Meters::Temperature::SCALE_THICKNESS_RATIO,
+                                lv_color_hex(DisplayColors::METER), 10);
     lv_obj_set_style_text_color(tempMeter, lv_color_hex(DisplayColors::METER), LV_PART_TICKS);
-    lv_meter_set_scale_range(tempMeter, scale, 0, 100, 270, 135);
+
+    // Set scale range and angles to match the arc
+    const int16_t angle_range = 270;  // Total angle range
+    const int16_t angle_offset = 135; // Starting angle offset
+    lv_meter_set_scale_range(tempMeter, scale, 
+                            Config::Display::Dashboard::Meters::Temperature::MIN_TEMP,
+                            Config::Display::Dashboard::Meters::Temperature::MAX_TEMP, 
+                            angle_range, angle_offset);
+    lv_arc_set_value(arcTempMeter, Config::Display::Dashboard::Meters::Temperature::MIN_TEMP);
 
     // Create and setup background arc
     arcTempMeter = lv_arc_create(meter_container);
-    lv_obj_set_size(arcTempMeter, widget_size , widget_size);
+    lv_obj_set_size(arcTempMeter, widget_size, widget_size);
     lv_obj_clear_flag(arcTempMeter, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_PRESS_LOCK | 
                      LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | 
                      LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | 
@@ -215,13 +224,23 @@ void DashboardScreen::createTemperatureMeter(uint16_t size, uint16_t xPosFromLef
     lv_obj_set_style_arc_opa(arcTempMeter, 0, LV_PART_MAIN); // Hide background arc
     lv_obj_set_style_arc_rounded(arcTempMeter, false, LV_PART_INDICATOR); // Remove rounded ends
     
-    // Set arc properties
+    // Set arc properties and align with meter scale
     lv_obj_set_style_arc_opa(arcTempMeter, 255, LV_PART_INDICATOR);
     lv_obj_set_style_arc_img_src(arcTempMeter, &ui_img_gradient_225_170px_png, LV_PART_INDICATOR | LV_STATE_DEFAULT);
+    lv_obj_set_style_arc_width(arcTempMeter, widget_size * Config::Display::Dashboard::Meters::Temperature::SCALE_THICKNESS_RATIO, LV_PART_INDICATOR);
+    
+    // Configure arc angles to match the meter scale
+    lv_arc_set_rotation(arcTempMeter, angle_offset);
+    lv_arc_set_bg_angles(arcTempMeter, 0, angle_range);
+    lv_arc_set_angles(arcTempMeter, 0, 0); // Initial value
+    
+    // Set arc range to match the meter
+    lv_arc_set_range(arcTempMeter, 
+                     Config::Display::Dashboard::Meters::Temperature::MIN_TEMP * 2,  // Multiply by 2 since we're using half-degree precision
+                     Config::Display::Dashboard::Meters::Temperature::MAX_TEMP * 2); // Multiply by 2 since we're using half-degree precision
+    
     lv_obj_center(arcTempMeter);
-
     lv_obj_move_background(arcTempMeter);
-
 
     // Create and setup temperature label
     tempLabel = lv_label_create(tempMeter);
@@ -240,14 +259,13 @@ void DashboardScreen::createSpeedMeter(uint16_t size, uint16_t xPosFromRight) {
     lv_obj_set_size(speed_container, size, size);
     lv_obj_set_style_bg_opa(speed_container, LV_OPA_0, LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(speed_container, 0, LV_STATE_DEFAULT);
-    lv_obj_set_style_radius(speed_container, size * 0.55, LV_STATE_DEFAULT);
     lv_obj_set_style_pad_all(speed_container, 0, LV_STATE_DEFAULT);
     
     // Center the container
-    lv_obj_align(speed_container, LV_ALIGN_BOTTOM_RIGHT, -xPosFromRight,  size * 0.08);
+    lv_obj_align(speed_container, LV_ALIGN_BOTTOM_RIGHT, -xPosFromRight, size * Config::Display::Dashboard::Meters::BOTTOM_OFFSET_RATIO);
     lv_obj_update_layout(speed_container);
     
-    uint16_t widget_size = size * 0.98;
+    uint16_t widget_size = size * Config::Display::Dashboard::Meters::WIDGET_TO_CONTAINER_RATIO;
     // Create speed meter
     speedMeter = lv_meter_create(speed_container);
     // Remove default indicator circle
@@ -263,18 +281,27 @@ void DashboardScreen::createSpeedMeter(uint16_t size, uint16_t xPosFromRight) {
 
     // Add scale for speed
     lv_meter_scale_t* scale = lv_meter_add_scale(speedMeter);
-    lv_meter_set_scale_ticks(speedMeter, scale, 41, 2, 10, lv_color_hex(DisplayColors::METER));
-    lv_meter_set_scale_major_ticks(speedMeter, scale, 8, 4, widget_size * 0.12, lv_color_hex(DisplayColors::METER), 10);
+    lv_meter_set_scale_ticks(speedMeter, scale, 41, 2, 10,     // 40 divisions = 2.5% per minor tick
+                            lv_color_hex(DisplayColors::METER));
+    lv_meter_set_scale_major_ticks(speedMeter, scale, 8, 4,    // Every 8th tick = 20% intervals
+                                widget_size * Config::Display::Dashboard::Meters::Fan::SCALE_THICKNESS_RATIO,
+                                lv_color_hex(DisplayColors::METER), 10);
     lv_obj_set_style_text_color(speedMeter, lv_color_hex(DisplayColors::METER), LV_PART_TICKS);
-    lv_meter_set_scale_range(speedMeter, scale, 0, 100, 270, 135);
+    lv_meter_set_scale_range(speedMeter, scale,  
+                             Config::Display::Dashboard::Meters::Fan::MIN_SPEED, 
+                             Config::Display::Dashboard::Meters::Fan::MAX_SPEED, 270, 135);
     
     // Add target speed arc
-    targetSpeedIndicator = lv_meter_add_arc(speedMeter, scale, widget_size * 0.05, lv_color_hex(DisplayColors::TARGET_SPEED), 0);
-    lv_meter_set_indicator_start_value(speedMeter, targetSpeedIndicator, 0);
-    lv_meter_set_indicator_end_value(speedMeter, targetSpeedIndicator, 100);
+    targetSpeedIndicator = lv_meter_add_arc(speedMeter, scale, 
+                                            widget_size * Config::Display::Dashboard::Meters::Fan::ARC_THICKNESS_RATIO,
+                                            lv_color_hex(DisplayColors::TARGET_SPEED), 0);
+    lv_meter_set_indicator_value(speedMeter, targetSpeedIndicator, 0);
 
     // Add current speed arc
-    currentSpeedIndicator = lv_meter_add_arc(speedMeter, scale, widget_size * 0.05, lv_color_hex(DisplayColors::CURRENT_SPEED), -widget_size * 0.05);
+    currentSpeedIndicator = lv_meter_add_arc(speedMeter, scale, 
+                                            widget_size * Config::Display::Dashboard::Meters::Fan::ARC_THICKNESS_RATIO,
+                                            lv_color_hex(DisplayColors::CURRENT_SPEED), 
+                                            -widget_size * Config::Display::Dashboard::Meters::Fan::ARC_THICKNESS_RATIO);
     lv_meter_set_indicator_value(speedMeter, currentSpeedIndicator, 0);
 
     // Create speed label
@@ -314,14 +341,16 @@ void DashboardScreen::updateTemperatureDisplay(float temp) {
     MutexGuard guard(uiMutex, pdMS_TO_TICKS(10));
     if (!guard.isLocked()) return;
 
-    int targetValue = constrain((int)(temp * 2), 0, 100);
-    
+    int targetValue = constrain((int)(temp * 2), 
+        Config::Display::Dashboard::Meters::Temperature::MIN_TEMP * 2,
+        Config::Display::Dashboard::Meters::Temperature::MAX_TEMP * 2);
+
     if (!tempAnimationInProgress && targetValue != currentTempValue) {
         lv_anim_t anim;
         lv_anim_init(&anim);
         lv_anim_set_var(&anim, arcTempMeter);
         lv_anim_set_values(&anim, currentTempValue, targetValue);
-        lv_anim_set_time(&anim, 2000);
+        lv_anim_set_time(&anim, Config::Display::Dashboard::Meters::Animation::SPEED_MS);
         lv_anim_set_path_cb(&anim, lv_anim_path_ease_out);
         lv_anim_set_exec_cb(&anim, [](void* var, int32_t value) {
             lv_arc_set_value((lv_obj_t*)var, value);
@@ -339,9 +368,9 @@ void DashboardScreen::updateTemperatureDisplay(float temp) {
     char tempStr[32];
     
     lv_color_t tempColor;
-    if (temp < 30.0f) {
+    if (temp < Config::Display::Dashboard::Meters::Temperature::GOOD_TO_WARNING_THRESHOLD) {
         tempColor = lv_color_hex(DisplayColors::TEMP_GOOD);
-    } else if (temp < 60.0f) {
+    } else if (temp < Config::Display::Dashboard::Meters::Temperature::WARNING_TO_CRITICAL_THRESHOLD) {
         tempColor = lv_color_hex(DisplayColors::TEMP_WARNING);
     } else {
         tempColor = lv_color_hex(DisplayColors::TEMP_CRITICAL);
@@ -389,7 +418,7 @@ void DashboardScreen::updateSpeedDisplay(int fanSpeed, int targetSpeed) {
         lv_anim_init(&anim);
         lv_anim_set_var(&anim, speedMeter);
         lv_anim_set_values(&anim, currentSpeedValue, fanSpeed);
-        lv_anim_set_time(&anim, 2000);
+        lv_anim_set_time(&anim, Config::Display::Dashboard::Meters::Animation::SPEED_MS);
         lv_anim_set_path_cb(&anim, lv_anim_path_ease_out);
         lv_anim_set_exec_cb(&anim, set_current_speed_value);
         lv_anim_set_ready_cb(&anim, [](lv_anim_t* a) {
@@ -405,15 +434,15 @@ void DashboardScreen::updateSpeedDisplay(int fanSpeed, int targetSpeed) {
         lv_anim_t anim;
         lv_anim_init(&anim);
         lv_anim_set_var(&anim, speedMeter);
-        lv_anim_set_values(&anim, targetSpeedValue, fanSpeed);
-        lv_anim_set_time(&anim, 2000);
+        lv_anim_set_values(&anim, targetSpeedValue, targetSpeed);
+        lv_anim_set_time(&anim, Config::Display::Dashboard::Meters::Animation::SPEED_MS);
         lv_anim_set_path_cb(&anim, lv_anim_path_ease_out);
         lv_anim_set_exec_cb(&anim, set_target_speed_value);
         lv_anim_set_ready_cb(&anim, [](lv_anim_t* a) {
             ((DashboardScreen*)lv_obj_get_user_data(lv_obj_get_parent((lv_obj_t*)a->var)))->targetSpeedAnimationInProgress = false;
         });
         
-        currentSpeedAnimationInProgress = true;
+        targetSpeedAnimationInProgress = true;
         lv_anim_start(&anim);
         targetSpeedValue = targetSpeed;
     }
@@ -421,9 +450,9 @@ void DashboardScreen::updateSpeedDisplay(int fanSpeed, int targetSpeed) {
     // Update the speed label
     char speedStr[32];
     lv_color_t speedColor;
-    if (fanSpeed < 30) {
+    if (fanSpeed < Config::Display::Dashboard::Meters::Fan::GOOD_TO_WARNING_THRESHOLD) {
         speedColor = lv_color_hex(DisplayColors::SPEED_GOOD);
-    } else if (fanSpeed < 60) {
+    } else if (fanSpeed < Config::Display::Dashboard::Meters::Fan::WARNING_TO_CRITICAL_THRESHOLD) {
         speedColor = lv_color_hex(DisplayColors::SPEED_WARNING);
     } else {
         speedColor = lv_color_hex(DisplayColors::SPEED_CRITICAL);
@@ -484,21 +513,5 @@ void DashboardScreen::addDebugPoints(lv_obj_t* meter_container, uint16_t size) {
                  lv_obj_get_width(meter_container)/2, 
                  lv_obj_get_height(meter_container)/2, 
                  lv_color_make(255, 255, 0));
-    
-    // // Meter coordinates (green)
-    // lv_coord_t meter_x = lv_obj_get_x(tempMeter);
-    // lv_coord_t meter_y = lv_obj_get_y(tempMeter);
-    // addDebugPoint(meter_container, meter_x, meter_y, lv_color_make(0, 255, 0));  // Top-left
-    // addDebugPoint(meter_container, meter_x + size, meter_y, lv_color_make(0, 255, 0));  // Top-right
-    // addDebugPoint(meter_container, meter_x, meter_y + size, lv_color_make(0, 255, 0));  // Bottom-left
-    // addDebugPoint(meter_container, meter_x + size, meter_y + size, lv_color_make(0, 255, 0));  // Bottom-right
-    
-    // // Arc coordinates (blue)
-    // lv_coord_t arc_x = lv_obj_get_x(arcMeter);
-    // lv_coord_t arc_y = lv_obj_get_y(arcMeter);
-    // float arc_size = size * 0.7;
-    // addDebugPoint(meter_container, arc_x, arc_y, lv_color_make(0, 0, 255));  // Top-left
-    // addDebugPoint(meter_container, arc_x + arc_size, arc_y, lv_color_make(0, 0, 255));  // Top-right
-    // addDebugPoint(meter_container, arc_x, arc_y + arc_size, lv_color_make(0, 0, 255));  // Bottom-left
-    // addDebugPoint(meter_container, arc_x + arc_size, arc_y + arc_size, lv_color_make(0, 0, 255));  // Bottom-right
+
 }

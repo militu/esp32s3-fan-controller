@@ -23,12 +23,6 @@
 class TaskManager {
 public:
     //--------------------------------------------------------------------------
-    // Constants
-    //--------------------------------------------------------------------------
-    static constexpr size_t MAX_TASKS = 10;
-    static constexpr size_t STACK_WARNING_THRESHOLD = 200;
-
-    //--------------------------------------------------------------------------
     // Types & Structures
     //--------------------------------------------------------------------------
     struct TaskHealth {
@@ -120,10 +114,10 @@ private:
     //--------------------------------------------------------------------------
     // Member Variables
     //--------------------------------------------------------------------------
-    bool initialized;             ///< Initialization state
-    bool suspended;              ///< System suspension state
-    SemaphoreHandle_t mutex;     ///< Protection for shared resources
-    TaskInfo tasks[MAX_TASKS];   ///< Task tracking array
+    bool initialized;                                 ///< Initialization state
+    bool suspended;                                   ///< System suspension state
+    SemaphoreHandle_t mutex;                          ///< Protection for shared resources
+    TaskInfo tasks[Config::TaskManager::MAX_TASKS];   ///< Task tracking array
 
     //--------------------------------------------------------------------------
     // Internal Methods
