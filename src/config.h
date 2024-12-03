@@ -29,7 +29,7 @@ namespace Config {
             constexpr bool FAN = false;
             constexpr bool MAIN = false;
             constexpr bool MQTT = false;
-            constexpr bool SCREEN = true;
+            constexpr bool SCREEN = false;
             constexpr bool TASK_MANAGER = false;
             constexpr bool NTP = false;
             constexpr bool INITIALIZER = false;
@@ -154,7 +154,7 @@ namespace Config {
      * @brief MQTT communication configuration
      */
     namespace MQTT {
-        constexpr char SERVER[] = "broker.hivemq.com";
+        constexpr char SERVER[] = "test.mosquitto.org";
         constexpr uint16_t PORT = 1883;
         constexpr char CLIENT_ID[] = "esp32_fan_controller";
         constexpr uint32_t RECONNECT_DELAY_MS = 5000;
