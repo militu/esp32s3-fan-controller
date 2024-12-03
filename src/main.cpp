@@ -55,7 +55,7 @@ void setup() {
     );
     
     // For testing, skip network initialization
-    SystemInitializer::InitConfig config(true);  // true = skip networking
+    SystemInitializer::InitConfig config(false);  // true = skip networking
     
     if (!initializer.initialize(config)) {
         Serial.println("System initialization failed!");
