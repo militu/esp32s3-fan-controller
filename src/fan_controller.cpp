@@ -21,16 +21,16 @@ FanController::FanController(TaskManager& tm, ConfigPreference& config)
     , tempSensor(nullptr)
     , ntpManager(nullptr)
     , config{
-        .minTemp = Config::Temperature::Control::MIN_TEMP,
-        .maxTemp = Config::Temperature::Control::MAX_TEMP,
+        .minTriggerTemp = Config::Fan::Control::MIN_TRIGGER_TEMP,
+        .maxTriggerTemp = Config::Fan::Control::MAX_TRIGGER_TEMP,
         .minSpeed = Config::Fan::Speed::MIN_PERCENT,
         .maxSpeed = Config::Fan::Speed::MAX_PERCENT,
         .minPWM = Config::Fan::Speed::MIN_PWM,
         .maxPWM = Config::Fan::Speed::MAX_PWM,
-        .nightMaxSpeed = Config::NightMode::MAX_SPEED,
+        .nightMaxSpeed = Config::Fan::NightMode::MAX_SPEED_PERCENT,
         .minRPM = Config::Fan::RPM::MINIMUM,
-        .nightStartHour = Config::NightMode::START_HOUR,
-        .nightEndHour = Config::NightMode::END_HOUR,
+        .nightStartHour = Config::Fan::NightMode::START_HOUR,
+        .nightEndHour = Config::Fan::NightMode::END_HOUR,
         .testMode = true     // Enable test mode for Wokwi
     }
     , mode(Mode::AUTO)
@@ -74,7 +74,10 @@ esp_err_t FanController::begin() {
     currentSpeed = config.minSpeed;
     ledcWrite(Config::Fan::PWM::CHANNEL, SpeedToRawPWM(currentSpeed));
 
-    TaskManager::TaskConfig taskConfig("Fan", TASK_STACK_SIZE, TASK_PRIORITY, TASK_CORE);
+    TaskManager::TaskConfig taskConfig("Fan", 
+                                       Config::Fan::Task::STACK_SIZE,
+                                       Config::Fan::Task::TASK_PRIORITY, 
+                                       Config::Fan::Task::TASK_CORE);
     esp_err_t err = taskManager.createTask(taskConfig, fanTask, this);
     
     if (err != ESP_OK) return err;
@@ -333,7 +336,7 @@ void FanController::processUpdate() {
     // Handle stall detection
     if (currentSpeed > config.minSpeed && measuredRPM < config.minRPM) {
         stallCount++;
-        if (stallCount >= STALL_RETRY_COUNT) {
+        if (stallCount >= Config::Fan::Control::STALL_RETRY_COUNT) {
             status = Status::SHUTOFF;
             currentSpeed = 0;
             ledcWrite(Config::Fan::PWM::CHANNEL, 0);
@@ -384,7 +387,7 @@ void FanController::fanTask(void* parameters) {
         TickType_t now = xTaskGetTickCount();
         
         // Process events more frequently than RPM updates
-        if ((now - lastEventCheck) >= pdMS_TO_TICKS(EVENT_CHECK_INTERVAL)) {
+        if ((now - lastEventCheck) >= pdMS_TO_TICKS(Config::Fan::Control::EVENT_CHECK_INTERVAL)) {
             fan->processEvents();
             lastEventCheck = now;
         }
@@ -405,7 +408,7 @@ void FanController::fanTask(void* parameters) {
 
 bool FanController::setupPWM() {
     ledcSetup(Config::Fan::PWM::CHANNEL, Config::Fan::PWM::FREQUENCY, Config::Fan::PWM::RESOLUTION);
-    ledcAttachPin(Config::Fan::PWM::PIN, Config::Fan::PWM::CHANNEL);
+    ledcAttachPin(Config::Fan::PWM::PWM_PIN, Config::Fan::PWM::CHANNEL);
     return true;
 }
 
@@ -465,8 +468,8 @@ bool FanController::isStalled() const {
  ******************************************************************************/
 
 uint8_t FanController::calculateSpeedForTemperature(float temp) const {
-    temp = constrain(temp, config.minTemp, config.maxTemp);
-    float ratio = (temp - config.minTemp) / (config.maxTemp - config.minTemp);
+    temp = constrain(temp, config.minTriggerTemp, config.maxTriggerTemp);
+    float ratio = (temp - config.minTriggerTemp) / (config.maxTriggerTemp - config.minTriggerTemp);
     return config.minSpeed + (ratio * (config.maxSpeed - config.minSpeed));
 }
 

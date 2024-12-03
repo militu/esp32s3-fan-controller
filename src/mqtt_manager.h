@@ -28,12 +28,9 @@ public:
     /**
      * @brief Message structure for MQTT queue
      */
-    struct MQTTMessage {
-        static constexpr size_t MAX_TOPIC_LENGTH = 64;
-        static constexpr size_t MAX_PAYLOAD_LENGTH = 256;
-        
-        char topic[MAX_TOPIC_LENGTH];
-        char payload[MAX_PAYLOAD_LENGTH];
+    struct MQTTMessage {        
+        char topic[Config::MQTT::Message::MAX_TOPIC_LENGTH];
+        char payload[Config::MQTT::Message::MAX_PAYLOAD_LENGTH];
         size_t payloadLength;
     };
 
@@ -83,16 +80,6 @@ public:
     uint32_t getTotalTimeout();
 
 private:
-    // Constants
-    static constexpr size_t QUEUE_SIZE = 10;
-    static constexpr uint32_t QUEUE_TIMEOUT_MS = 100;
-    static constexpr uint32_t MUTEX_TIMEOUT_MS = 1000;
-    static constexpr uint32_t MQTT_STACK_SIZE = 8192;
-    static constexpr UBaseType_t MQTT_TASK_PRIORITY = 4;
-    static constexpr BaseType_t MQTT_TASK_CORE = 1;
-    static constexpr uint32_t AVAILABILITY_INTERVAL = 30000;
-    static constexpr uint32_t CLIENT_LOOP_INTERVAL = 50;
-
     // Core components
     TaskManager& taskManager;
     TempSensor& tempSensor;

@@ -75,27 +75,15 @@ private:
     BootScreen bootUI;
 
     // LVGL and uiUpdate task handling
-    static void lvglTask(void* parameters);
-    void processLVGL();
-    static void uiUpdateTask(void* parameters);
-    void processUIUpdates();
+    static void displayRenderTask(void* parameters);
+    void processDisplayRender();
+    static void displayUpdateTask(void* parameters);
+    void processDisplayUpdates();
 
     static void flush_cb(lv_disp_drv_t* disp_drv, const lv_area_t* area, lv_color_t* color_p);
     void updateDashboardValues();
 
-    // Constants
-    static constexpr uint32_t LVGL_STACK_SIZE = 4096;
-    static constexpr UBaseType_t LVGL_TASK_PRIORITY = 4;  
-    static constexpr BaseType_t LVGL_TASK_CORE = 0;
-
-    static constexpr uint32_t UI_UPDATE_STACK_SIZE = 4096;
-    static constexpr UBaseType_t UI_UPDATE_TASK_PRIORITY = 2;
-    static constexpr BaseType_t UI_UPDATE_TASK_CORE = 1;
-
-    static constexpr uint32_t UPDATE_INTERVAL = 100;
-    static constexpr uint32_t LVGL_TASK_DELAY = 16;
-
-    struct UICommand {
+    struct DisplayUpdateCommand {
         enum class CommandType {
             UPDATE_DISPLAY,
         };
@@ -110,9 +98,9 @@ private:
         bool nightModeEnabled;
         bool nightModeActive;
 
-        UICommand() {} // Default constructor
+        DisplayUpdateCommand() {} // Default constructor
         
-        UICommand(float temp, uint8_t current, uint8_t target, 
+        DisplayUpdateCommand(float temp, uint8_t current, uint8_t target, 
                  FanController::Mode mode, bool wifi, 
                  bool mqtt, bool nightEnabled, bool nightActive)
             : type(CommandType::UPDATE_DISPLAY)
@@ -126,8 +114,7 @@ private:
             , nightModeActive(nightActive) {}
     };
 
-    QueueHandle_t uiCommandQueue;
-    static const uint8_t QUEUE_SIZE = 5;  // Adjust based on update frequency
+    QueueHandle_t DisplayUpdateCommandQueue;
 
     lv_obj_t* currentScreen;  // Keep track of active screen
     bool needsScreenTransition = false;

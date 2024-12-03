@@ -30,7 +30,7 @@ MqttManager::MqttManager(TaskManager& tm, TempSensor& ts, FanController& fc)
     connectionMutex = xSemaphoreCreateMutex();
     messageMutex = xSemaphoreCreateMutex();
     stateMutex = xSemaphoreCreateMutex();
-    messageQueue = xQueueCreate(QUEUE_SIZE, sizeof(MQTTMessage));
+    messageQueue = xQueueCreate(Config::MQTT::QUEUE_SIZE, sizeof(MQTTMessage));
 
     if (!connectionMutex || !messageMutex || !stateMutex || !messageQueue) {
         DEBUG_LOG("Failed to create one or more mutexes/queue!");
@@ -69,7 +69,10 @@ esp_err_t MqttManager::begin() {
     mqttClient.setKeepAlive(30);      // 30 seconds keepalive
 
     // Create MQTT task using TaskManager
-    TaskManager::TaskConfig taskConfig("MQTT", MQTT_STACK_SIZE, MQTT_TASK_PRIORITY, MQTT_TASK_CORE);
+    TaskManager::TaskConfig taskConfig("MQTT", 
+                                       Config::MQTT::Task::STACK_SIZE, 
+                                       Config::MQTT::Task::TASK_PRIORITY, 
+                                       Config::MQTT::Task::TASK_CORE);
     DEBUG_LOG("Creating MQTT task...");
     esp_err_t err = taskManager.createTask(taskConfig, mqttTask, this);
     
@@ -108,7 +111,7 @@ void MqttManager::connect() {
     connectionAttempts++;  // Increment before attempt
 
     // Calculate backoff delay based on attempt number (with proper type handling)
-    uint32_t baseDelay = Config::MQTT::RECONNECT_DELAY;
+    uint32_t baseDelay = Config::MQTT::RECONNECT_DELAY_MS;
     uint32_t maxDelay = 30000UL;
     
     // Cast to uint32_t and limit the shift value directly without min
@@ -147,14 +150,14 @@ void MqttManager::processUpdate() {
     unsigned long now = millis();
 
     // Handle client loop and basic MQTT operations
-    if (now - lastClientLoop >= CLIENT_LOOP_INTERVAL) { 
+    if (now - lastClientLoop >= Config::MQTT::CLIENT_LOOP_INTERVAL) { 
         lastClientLoop = now;
         mqttClient.loop();
     }
 
     // Check connection and reconnect if needed
     if (!mqttClient.connected() && !connecting) {
-        if (now - lastConnectAttempt >= Config::MQTT::RECONNECT_DELAY) {
+        if (now - lastConnectAttempt >= Config::MQTT::RECONNECT_DELAY_MS) {
             DEBUG_LOG("Attempting MQTT reconnection");
             lastConnectAttempt = now;
             connect();
@@ -167,7 +170,7 @@ void MqttManager::processUpdate() {
         connectionAttempts = 0;
 
         // Publish availability status periodically
-        if (now - lastAvailabilityPublish >= AVAILABILITY_INTERVAL) {
+        if (now - lastAvailabilityPublish >= Config::MQTT::AVAILABILITY_INTERVAL) {
             lastAvailabilityPublish = now;
             mqttClient.publish(Config::MQTT::Topics::AVAILABILITY, "online", true);
             DEBUG_LOG("Published availability status");
@@ -194,10 +197,10 @@ bool MqttManager::setupSubscriptions() {
     bool success = true;
     
     // Control topics
-    success &= mqttClient.subscribe(Config::MQTT::Topics::MODE_SET);
-    success &= mqttClient.subscribe(Config::MQTT::Topics::NIGHT_MODE_SET);
-    success &= mqttClient.subscribe(Config::MQTT::Topics::NIGHT_SETTINGS_SET);
-    success &= mqttClient.subscribe(Config::MQTT::Topics::RECOVERY_SET);
+    success &= mqttClient.subscribe(Config::MQTT::Topics::Control::MODE);
+    success &= mqttClient.subscribe(Config::MQTT::Topics::Control::NIGHT_MODE);
+    success &= mqttClient.subscribe(Config::MQTT::Topics::Control::NIGHT_SETTINGS);
+    success &= mqttClient.subscribe(Config::MQTT::Topics::Control::RECOVERY);
     
     DEBUG_LOG("Subscriptions setup %s", success ? "successful" : "failed");
     return success;
@@ -247,15 +250,15 @@ bool MqttManager::enqueueMessage(const char* topic, const byte* payload, unsigne
     }
 
     MQTTMessage msg;
-    strncpy(msg.topic, topic, MQTTMessage::MAX_TOPIC_LENGTH - 1);
-    msg.topic[MQTTMessage::MAX_TOPIC_LENGTH - 1] = '\0';
+    strncpy(msg.topic, topic, Config::MQTT::Message::MAX_TOPIC_LENGTH - 1);
+    msg.topic[Config::MQTT::Message::MAX_TOPIC_LENGTH - 1] = '\0';
     
-    size_t copyLength = min(length, (unsigned int)(MQTTMessage::MAX_PAYLOAD_LENGTH - 1));
+    size_t copyLength = min(length, (unsigned int)(Config::MQTT::Message::MAX_PAYLOAD_LENGTH - 1));
     memcpy(msg.payload, payload, copyLength);
     msg.payload[copyLength] = '\0';
     msg.payloadLength = copyLength;
 
-    BaseType_t result = xQueueSend(messageQueue, &msg, pdMS_TO_TICKS(QUEUE_TIMEOUT_MS));
+    BaseType_t result = xQueueSend(messageQueue, &msg, pdMS_TO_TICKS(Config::MQTT::QUEUE_TIMEOUT_MS));
     DEBUG_LOG("Message enqueued: %s", result == pdTRUE ? "success" : "failed");
     return result == pdTRUE;
 }
@@ -282,7 +285,7 @@ void MqttManager::handleMessage(const char* topic, const byte* payload, unsigned
     static const uint32_t JSON_PROCESSING_TIMEOUT = 1000; // 1 second timeout for JSON processing
     static const uint32_t STATE_UPDATE_TIMEOUT = 2000;    // 2 second timeout for state updates
     
-    if (!topic || !payload || length == 0 || length >= MQTTMessage::MAX_PAYLOAD_LENGTH) {
+    if (!topic || !payload || length == 0 || length >= Config::MQTT::Message::MAX_PAYLOAD_LENGTH) {
         DEBUG_LOG("Invalid message parameters");
         return;
     }
@@ -394,16 +397,16 @@ void MqttManager::handleMessage(const char* topic, const byte* payload, unsigned
 
 // Helper method to determine message action from topic
 MqttManager::MessageAction MqttManager::determineMessageAction(const char* topic) {
-    if (strcmp(topic, Config::MQTT::Topics::MODE_SET) == 0) {
+    if (strcmp(topic, Config::MQTT::Topics::Control::MODE) == 0) {
         return MessageAction::MODE;
     }
-    else if (strcmp(topic, Config::MQTT::Topics::NIGHT_MODE_SET) == 0) {
+    else if (strcmp(topic, Config::MQTT::Topics::Control::NIGHT_MODE) == 0) {
         return MessageAction::NIGHT_MODE;
     }
-    else if (strcmp(topic, Config::MQTT::Topics::RECOVERY_SET) == 0) {
+    else if (strcmp(topic, Config::MQTT::Topics::Control::RECOVERY) == 0) {
         return MessageAction::RECOVERY;
     }
-    else if (strcmp(topic, Config::MQTT::Topics::NIGHT_SETTINGS_SET) == 0) {
+    else if (strcmp(topic, Config::MQTT::Topics::Control::NIGHT_SETTINGS) == 0) {
         return MessageAction::NIGHT_SETTINGS;
     }
     return MessageAction::INVALID;
@@ -545,8 +548,8 @@ void MqttManager::publishStatus() {
     }
 
     // Publish both status documents
-    bool systemPublished = publishJson(Config::MQTT::Topics::SYSTEM_STATUS, systemDoc);
-    bool nightPublished = publishJson(Config::MQTT::Topics::NIGHT_MODE_STATUS, nightDoc);
+    bool systemPublished = publishJson(Config::MQTT::Topics::Status::SYSTEM, systemDoc);
+    bool nightPublished = publishJson(Config::MQTT::Topics::Status::NIGHT_MODE, nightDoc);
 
     DEBUG_LOG("Status published - System: %s, Night Mode: %s",
               systemPublished ? "success" : "failed",
@@ -623,7 +626,7 @@ const char* MqttManager::getFanStatusString(FanController::Status status) {
 
 uint32_t MqttManager::getTotalTimeout() {
   // Get the base reconnect delay from configuration
-  uint32_t baseDelay = Config::MQTT::RECONNECT_DELAY;
+  uint32_t baseDelay = Config::MQTT::RECONNECT_DELAY_MS;
 
   // Calculate total timeout based on the backoff strategy
   uint32_t totalTimeout = 0;

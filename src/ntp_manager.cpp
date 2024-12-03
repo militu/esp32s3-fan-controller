@@ -55,7 +55,10 @@ esp_err_t NTPManager::begin() {
     tzset();
 
     // Create background task
-    TaskManager::TaskConfig taskConfig("NTP", NTP_STACK_SIZE, NTP_TASK_PRIORITY, NTP_TASK_CORE);
+    TaskManager::TaskConfig taskConfig("NTP", 
+                                       Config::NTP::Task::STACK_SIZE, 
+                                       Config::NTP::Task::TASK_PRIORITY, 
+                                       Config::NTP::Task::TASK_CORE);
     esp_err_t err = taskManager.createTask(taskConfig, ntpTask, this);
     
     if (err != ESP_OK) {
@@ -81,7 +84,7 @@ void NTPManager::processUpdate() {
     uint32_t currentTime = millis();
     
     // Handle initial sync or periodic resync
-    if (!timeSynchronized || (currentTime - lastSyncTime >= Config::NTP::SYNC_INTERVAL)) {
+    if (!timeSynchronized || (currentTime - lastSyncTime >= Config::NTP::SYNC_INTERVAL_MS)) {
         if (!attemptInProgress && 
             (currentTime - lastAttemptTime >= currentRetryDelay || lastAttemptTime == 0)) {
             
@@ -99,7 +102,7 @@ void NTPManager::processUpdate() {
                         syncAttempts, Config::NTP::MAX_SYNC_ATTEMPTS);
             
             struct tm timeinfo;
-            if (getLocalTime(&timeinfo, Config::NTP::SYNC_TIMEOUT)) {
+            if (getLocalTime(&timeinfo, Config::NTP::SYNC_TIMEOUT_MS)) {
                 lastSyncTime = currentTime;
                 time(&lastSyncEpoch);
                 timeSynchronized = true;
@@ -114,7 +117,7 @@ void NTPManager::processUpdate() {
         
         // Check if current attempt has timed out
         if (attemptInProgress && 
-            (currentTime - lastAttemptTime >= Config::NTP::SYNC_TIMEOUT)) {
+            (currentTime - lastAttemptTime >= Config::NTP::SYNC_TIMEOUT_MS)) {
             attemptInProgress = false;
             currentRetryDelay *= Config::NTP::BACKOFF_FACTOR;
             DEBUG_LOG("Sync attempt %d failed, next delay: %lu ms", 
@@ -131,7 +134,7 @@ bool NTPManager::forceSync() {
     
     // Reset retry parameters
     syncAttempts = 0;
-    currentRetryDelay = Config::NTP::RETRY_DELAY;
+    currentRetryDelay = Config::NTP::RETRY_DELAY_MS;
     lastAttemptTime = 0;
     attemptInProgress = false;
     
@@ -150,7 +153,7 @@ if (syncAttempts >= Config::NTP::MAX_SYNC_ATTEMPTS) {
 }
 
 struct tm timeinfo;
-bool success = getLocalTime(&timeinfo, Config::NTP::SYNC_TIMEOUT);
+bool success = getLocalTime(&timeinfo, Config::NTP::SYNC_TIMEOUT_MS);
 
 if (success) {
     lastSyncTime = millis();

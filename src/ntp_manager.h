@@ -52,11 +52,6 @@ public:
     }
     
 private:
-    // Task configuration
-    static constexpr uint32_t NTP_STACK_SIZE = 4096;
-    static constexpr UBaseType_t NTP_TASK_PRIORITY = 1;
-    static constexpr BaseType_t NTP_TASK_CORE = 1;
-
     // Core components
     TaskManager& taskManager;
     SemaphoreHandle_t mutex;
