@@ -29,7 +29,7 @@ bool DisplayManager::begin(DisplayDriver* displayDriver) {
     }
 
     this->driver = displayDriver;
-    
+
     if (!this->driver->begin()) {
         DEBUG_LOG_DISPLAY("DisplayManager: Driver initialization failed");
         return false;
@@ -297,16 +297,4 @@ void DisplayManager::showMQTTConnected() {
 
 void DisplayManager::showMQTTFailed(const char* reason) {
     showComponentStatus("MQTT", BootScreen::ComponentStatus::FAILED, reason);
-}
-
-/*******************************************************************************
- * Flush
- ******************************************************************************/
-
-void DisplayManager::flush_cb(lv_disp_drv_t* disp_drv, const lv_area_t* area, lv_color_t* color_p) {
-    DisplayManager* display = static_cast<DisplayManager*>(disp_drv->user_data);
-    if (display && display->driver) {
-        display->driver->flush(area, color_p);
-        lv_disp_flush_ready(disp_drv);
-    }
 }

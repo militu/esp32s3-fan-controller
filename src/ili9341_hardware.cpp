@@ -18,6 +18,9 @@ ILI9341Hardware::~ILI9341Hardware() {
 bool ILI9341Hardware::initialize() {
     if (!tft) return false;
 
+    pinMode(Pins::BL, OUTPUT);
+    digitalWrite(Pins::BL, HIGH);  // Start with backlight on
+
     // Initialize SPI communication
     SPI.begin();
     SPI.setFrequency(40000000);
@@ -40,7 +43,12 @@ bool ILI9341Hardware::initialize() {
     disp_drv.ver_res = config.height;
     disp_drv.flush_cb = [](lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *color_p) {
         ILI9341Hardware *instance = static_cast<ILI9341Hardware *>(drv->user_data);
-        instance->flush({area->x1, area->y1, area->x2, area->y2}, color_p);
+        instance->flush({
+            static_cast<uint16_t>(area->x1),
+            static_cast<uint16_t>(area->y1),
+            static_cast<uint16_t>(area->x2),
+            static_cast<uint16_t>(area->y2)
+        }, color_p);
     };
     disp_drv.draw_buf = &draw_buf;
     disp_drv.user_data = this;
@@ -54,7 +62,13 @@ void ILI9341Hardware::setPower(bool on) {
 }
 
 void ILI9341Hardware::setBrightness(uint8_t level) {
-    analogWrite(Pins::BL, level);
+    Serial.printf("Setting brightness to: %d\n", level);
+    // Test with digital write first
+    if (level > 127) {
+        digitalWrite(Pins::BL, HIGH);
+    } else {
+        digitalWrite(Pins::BL, LOW);
+    }
 }
 
 void ILI9341Hardware::flush(const Rect& area, lv_color_t* pixels) {
@@ -68,16 +82,26 @@ void ILI9341Hardware::flush(const Rect& area, lv_color_t* pixels) {
     lv_disp_flush_ready(&disp_drv);
 }
 
+// void ILI9341Hardware::powerOn() {
+//     sendCommand(SLPOUT_COMMAND);
+//     delay(120);
+//     sendCommand(DISPON_COMMAND);
+// }
+
+// For testing purpose on wokwi
 void ILI9341Hardware::powerOn() {
-    sendCommand(SLPOUT_COMMAND);
-    delay(120);
-    sendCommand(DISPON_COMMAND);
+    setBrightness(255);  // Full brightness
 }
 
+// void ILI9341Hardware::powerOff() {
+//     sendCommand(DISPOFF_COMMAND);
+//     delay(120);
+//     sendCommand(SLPIN_COMMAND);
+// }
+
+// For testing purpose on wokwi
 void ILI9341Hardware::powerOff() {
-    sendCommand(DISPOFF_COMMAND);
-    delay(120);
-    sendCommand(SLPIN_COMMAND);
+    setBrightness(0);
 }
 
 void ILI9341Hardware::enterSleep() {

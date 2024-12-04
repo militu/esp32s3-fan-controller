@@ -79,8 +79,6 @@ private:
     void processDisplayRender();
     static void displayUpdateTask(void* parameters);
     void processDisplayUpdates();
-
-    static void flush_cb(lv_disp_drv_t* disp_drv, const lv_area_t* area, lv_color_t* color_p);
     void updateDashboardValues();
 
     struct DisplayUpdateCommand {
