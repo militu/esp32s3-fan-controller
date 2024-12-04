@@ -127,7 +127,6 @@ void DisplayManager::displayUpdateTask(void* parameters) {
     display->processDisplayUpdates();
 }
 
-
 void DisplayManager::processDisplayRender() {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     
@@ -215,12 +214,10 @@ void DisplayManager::switchToDashboardUI() {
     updateDashboardValues();
     DEBUG_LOG_DISPLAY("Dashboard switch requested");
 }
-    
+
 void DisplayManager::updateBootStatus(const char* component, BootScreen::ComponentStatus status) {
-if (!initialized || currentState != DisplayState::BOOT) return;
-
-bootUI.updateStatus(component, status);
-
+    if (!initialized || currentState != DisplayState::BOOT) return;
+    bootUI.updateStatus(component, status);
 }
 
 void DisplayManager::updateBootStatusDetail(const char* component, 
@@ -288,13 +285,13 @@ void DisplayManager::showWifiFailed(const char* reason) {
 // NTP Methods
 void DisplayManager::showNTPInitializing() {
     showComponentStatus("NTP", BootScreen::ComponentStatus::WORKING, 
-                       "Starting time service...");
+                        "Starting time service...");
 }
 
 void DisplayManager::showNTPSyncing(uint8_t attempt, uint8_t maxAttempts) {
     char detail[64];
     snprintf(detail, sizeof(detail), "Synchronizing time (Attempt %d/%d)...", 
-            attempt, maxAttempts);
+             attempt, maxAttempts);
     showComponentStatus("NTP", BootScreen::ComponentStatus::WORKING, detail);
 }
 
@@ -311,19 +308,19 @@ void DisplayManager::showNTPFailed(const char* reason) {
 // MQTT Methods
 void DisplayManager::showMQTTInitializing() {
     showComponentStatus("MQTT", BootScreen::ComponentStatus::WORKING, 
-                       "Starting MQTT service...");
+                        "Starting MQTT service...");
 }
 
 void DisplayManager::showMQTTConnecting(uint8_t attempt, uint8_t maxAttempts) {
     char detail[64];
     snprintf(detail, sizeof(detail), "Connecting to broker (Attempt %d/%d)...", 
-            attempt, maxAttempts);
+             attempt, maxAttempts);
     showComponentStatus("MQTT", BootScreen::ComponentStatus::WORKING, detail);
 }
 
 void DisplayManager::showMQTTConnected() {
     showComponentStatus("MQTT", BootScreen::ComponentStatus::SUCCESS, 
-                       "Connected to broker");
+                        "Connected to broker");
 }
 
 void DisplayManager::showMQTTFailed(const char* reason) {
@@ -333,8 +330,7 @@ void DisplayManager::showMQTTFailed(const char* reason) {
 void DisplayManager::flush_cb(lv_disp_drv_t* disp_drv, const lv_area_t* area, lv_color_t* color_p) {
     DisplayManager* display = static_cast<DisplayManager*>(disp_drv->user_data);
     if (display && display->driver) {
-        display->driver->flush(area, (uint8_t*)color_p);
+        display->driver->flush(area, color_p);
         lv_disp_flush_ready(disp_drv);
     }
 }
-

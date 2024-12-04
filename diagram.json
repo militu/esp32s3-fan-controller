@@ -69,6 +69,20 @@
       "left": 191.45,
       "rotate": 90,
       "attrs": { "resistance": "220", "value": "220" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn_sleep",
+      "top": -147.4,
+      "left": 124.8,
+      "attrs": { "label": "Sleep Button" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn_wake",
+      "top": -147.4,
+      "left": 297.6,
+      "attrs": { "label": "Wake Button" }
     }
   ],
   "connections": [
@@ -107,7 +121,11 @@
       "pink",
       ["v60.57", "h-154.09", "v-134.4", "h-252.92", "v67.16"]
     ],
-    ["lcd1:MISO", "esp:13", "green", ["v0"]]
+    ["lcd1:MISO", "esp:13", "green", ["v0"]],
+    ["btn_sleep:1.l", "esp:7", "green", ["v0"]],
+    ["btn_sleep:2.l", "esp:GND.4", "black", ["v67.4", "h-96"]],
+    ["btn_wake:1.l", "esp:0", "green", ["v0"]],
+    ["btn_wake:2.l", "esp:GND.4", "black", ["v67.4", "h-96"]]
   ],
   "dependencies": {}
 }
