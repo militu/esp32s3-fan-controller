@@ -1,28 +1,19 @@
 #include "lilygo_hardware.h"
-#include <driver/ledc.h>  // for LED control functions
+#include <driver/ledc.h>
 
-
-/**
- * Callback for LVGL flush completion
- */
-static bool notify_lvgl_flush_ready(esp_lcd_panel_io_handle_t panel_io, 
-                                  esp_lcd_panel_io_event_data_t *edata, 
-                                  void *user_ctx) {
+static bool lvgl_flush_ready_cb(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_io_event_data_t *edata, void *user_ctx) {
     lv_disp_drv_t* disp_drv = (lv_disp_drv_t*)user_ctx;
-    if (disp_drv) {
-        lv_disp_flush_ready(disp_drv);
-    }
+    lv_disp_flush_ready(disp_drv);
     return false;
 }
 
 const DisplayHardware::DisplayConfig LilygoHardware::config = {
     .width = 320,
     .height = 170,
-    .bufferSize = 320 * 170  // Ensure this buffer size aligns with your needs
+    .bufferSize = 320 * 170,
 };
 
-LilygoHardware::LilygoHardware() 
-    : panelHandle(nullptr), ioHandle(nullptr) {}
+LilygoHardware::LilygoHardware() : panelHandle(nullptr), ioHandle(nullptr) {}
 
 bool LilygoHardware::initialize() {
     pinMode(Pins::POWER, OUTPUT);
@@ -30,7 +21,7 @@ bool LilygoHardware::initialize() {
     pinMode(Pins::RD, OUTPUT);
     digitalWrite(Pins::RD, HIGH);
 
-    if (!initializeBus() || !initializePanel()) {
+    if (!initializeBus() || !initializePanel() || !configureDisplay()) {
         return false;
     }
 
@@ -38,12 +29,29 @@ bool LilygoHardware::initialize() {
     ledcAttachPin(Pins::BL, 0);
     ledcWrite(0, 255);
 
-    powerState = PowerState::ON;
+    lv_init();
+
+    static lv_disp_draw_buf_t draw_buf;
+    static lv_color_t *buf1 = (lv_color_t *)heap_caps_malloc(config.width * 40 * sizeof(lv_color_t), MALLOC_CAP_DMA);
+
+    lv_disp_draw_buf_init(&draw_buf, buf1, nullptr, config.width * 40);
+
+    lv_disp_drv_init(&disp_drv);
+    disp_drv.hor_res = config.width;
+    disp_drv.ver_res = config.height;
+    disp_drv.flush_cb = [](lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *color_p) {
+        LilygoHardware *instance = static_cast<LilygoHardware *>(drv->user_data);
+        instance->flush({area->x1, area->y1, area->x2, area->y2}, color_p);
+    };
+    disp_drv.draw_buf = &draw_buf;
+    disp_drv.user_data = this;
+    lv_disp_drv_register(&disp_drv);
+
     return true;
 }
 
 void LilygoHardware::setPower(bool on) {
-    handlePowerTransition(on ? PowerState::ON : PowerState::OFF);
+    on ? powerOn() : powerOff();
 }
 
 void LilygoHardware::setBrightness(uint8_t level) {
@@ -51,14 +59,8 @@ void LilygoHardware::setBrightness(uint8_t level) {
 }
 
 void LilygoHardware::flush(const Rect& area, lv_color_t* pixels) {
-    if (!panelHandle || powerState != PowerState::ON) return;
-
-    esp_lcd_panel_draw_bitmap(
-        panelHandle, 
-        area.x1, area.y1,
-        area.x2 + 1, area.y2 + 1, 
-        pixels
-    );
+    if (!panelHandle) return;
+    esp_lcd_panel_draw_bitmap(panelHandle, area.x1, area.y1, area.x2 + 1, area.y2 + 1, pixels);
 }
 
 void LilygoHardware::powerOn() {
@@ -90,7 +92,7 @@ void LilygoHardware::sendCommand(uint8_t cmd) {
 }
 
 bool LilygoHardware::initializeBus() {
-    esp_lcd_i80_bus_handle_t i80_bus = nullptr;
+    esp_lcd_i80_bus_handle_t i80_bus;
 
     esp_lcd_i80_bus_config_t bus_config = {
         .dc_gpio_num = Pins::DC,
@@ -110,10 +112,10 @@ bool LilygoHardware::initializeBus() {
 
     esp_lcd_panel_io_i80_config_t io_config = {
         .cs_gpio_num = Pins::CS,
-        .pclk_hz = 20 * 1000 * 1000,   // 20MHz pixel clock
-        .trans_queue_depth = 20,
-        .on_color_trans_done = notify_lvgl_flush_ready,
-        .user_ctx = nullptr,
+        .pclk_hz = 20 * 1000 * 1000,
+        .trans_queue_depth = 10,
+        .on_color_trans_done = lvgl_flush_ready_cb,
+        .user_ctx = &disp_drv,
         .lcd_cmd_bits = 8,
         .lcd_param_bits = 8,
         .dc_levels = {
@@ -145,11 +147,12 @@ bool LilygoHardware::initializePanel() {
     esp_lcd_panel_mirror(panelHandle, false, true);
     esp_lcd_panel_set_gap(panelHandle, 0, 35);
 
-    return configureDisplay();
+    return true;
 }
 
 bool LilygoHardware::configureDisplay() {
-    const uint8_t st7789_init_cmds[] = {
+    // Here you can add any specific commands to configure the display further.
+    const uint8_t init_cmds[] = {
         0x11, 0,
         0x3A, 1, 0x05,
         0xB2, 5, 0x0C, 0x0C, 0x00, 0x33, 0x33,
@@ -165,13 +168,12 @@ bool LilygoHardware::configureDisplay() {
         0x29, 0
     };
 
-    for (size_t i = 0; i < sizeof(st7789_init_cmds);) {
-        uint8_t cmd = st7789_init_cmds[i++];
-        uint8_t len = st7789_init_cmds[i++];
-        
-        esp_lcd_panel_io_tx_param(ioHandle, cmd, len ? &st7789_init_cmds[i] : nullptr, len);
+    for (size_t i = 0; i < sizeof(init_cmds); ) {
+        uint8_t cmd = init_cmds[i++];
+        uint8_t len = init_cmds[i++];
+        esp_lcd_panel_io_tx_param(ioHandle, cmd, len ? &init_cmds[i] : nullptr, len);
         i += len;
-        
+
         if (cmd == 0x11 || cmd == 0x29) {
             delay(120);
         }

@@ -41,9 +41,10 @@ private:
     static constexpr uint8_t SLPOUT_COMMAND = 0x11;
     static constexpr uint8_t DISPON_COMMAND = 0x29;
     static constexpr uint8_t DISPOFF_COMMAND = 0x28;
-    
+
     static const DisplayConfig config;
     Adafruit_ILI9341* tft;
+    lv_disp_drv_t disp_drv;
 };
 
 #endif // ILI9341_HARDWARE_H

@@ -66,10 +66,10 @@ private:
     FanController& fanController;
     WifiManager& wifiManager;
     MqttManager& mqttManager;
-    
+
     DisplayDriver* driver;
     bool initialized;
-    
+
     DisplayState currentState;
     DashboardScreen dashboardUI;
     BootScreen bootUI;
@@ -87,7 +87,7 @@ private:
         enum class CommandType {
             UPDATE_DISPLAY,
         };
-        
+
         CommandType type;
         float temperature;
         uint8_t currentSpeed;
@@ -116,15 +116,14 @@ private:
 
     QueueHandle_t DisplayUpdateCommandQueue;
 
-    lv_obj_t* currentScreen;  // Keep track of active screen
-    bool needsScreenTransition = false;
-    
-    // Add these new methods
+    lv_obj_t* currentScreen;
+    bool needsScreenTransition;
+
     void initializeBootScreen();
 
     void showComponentStatus(const char* component, 
-                           BootScreen::ComponentStatus status,
-                           const char* detail);
+                             BootScreen::ComponentStatus status,
+                             const char* detail);
 };
 
 #endif // DISPLAY_MANAGER_H

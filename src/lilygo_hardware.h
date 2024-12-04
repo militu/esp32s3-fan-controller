@@ -58,6 +58,7 @@ private:
     static const DisplayConfig config;
     esp_lcd_panel_handle_t panelHandle;
     esp_lcd_panel_io_handle_t ioHandle;
+    lv_disp_drv_t disp_drv;
 };
 
 #endif // LILYGO_HARDWARE_H
