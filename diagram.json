@@ -6,8 +6,8 @@
     {
       "type": "board-ili9341-cap-touch",
       "id": "lcd1",
-      "top": -78.08,
-      "left": 465.54,
+      "top": -97.28,
+      "left": 513.54,
       "rotate": 90,
       "attrs": {}
     },
@@ -73,16 +73,9 @@
     {
       "type": "wokwi-pushbutton",
       "id": "btn_sleep",
-      "top": -147.4,
-      "left": 124.8,
+      "top": -61,
+      "left": 374.4,
       "attrs": { "label": "Sleep Button" }
-    },
-    {
-      "type": "wokwi-pushbutton",
-      "id": "btn_wake",
-      "top": -147.4,
-      "left": 297.6,
-      "attrs": { "label": "Wake Button" }
     }
   ],
   "connections": [
@@ -123,9 +116,7 @@
     ],
     ["lcd1:MISO", "esp:13", "green", ["v0"]],
     ["btn_sleep:1.l", "esp:7", "green", ["v0"]],
-    ["btn_sleep:2.l", "esp:GND.4", "black", ["v67.4", "h-96"]],
-    ["btn_wake:1.l", "esp:0", "green", ["v0"]],
-    ["btn_wake:2.l", "esp:GND.4", "black", ["v67.4", "h-96"]]
+    ["btn_sleep:2.l", "esp:GND.4", "black", ["v67.4", "h-96"]]
   ],
   "dependencies": {}
 }

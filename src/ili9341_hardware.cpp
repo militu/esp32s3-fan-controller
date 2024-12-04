@@ -3,8 +3,8 @@
 
 const DisplayHardware::DisplayConfig ILI9341Hardware::config = {
     .width = 320,
-    .height = 240,
-    .bufferSize = 320 * 240,
+    .height = 170, // emulate Lilygo S3
+    .bufferSize = 320 * 170, // emulate Lilygo S3
 };
 
 ILI9341Hardware::ILI9341Hardware() {
