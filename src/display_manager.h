@@ -60,16 +60,18 @@ public:
     void showMQTTConnected();
     void showMQTTFailed(const char* reason);
 
+    void handleButtonPress();
+
 private:
     TaskManager& taskManager;
     TempSensor& tempSensor;
     FanController& fanController;
     WifiManager& wifiManager;
     MqttManager& mqttManager;
-    
+
     DisplayDriver* driver;
     bool initialized;
-    
+
     DisplayState currentState;
     DashboardScreen dashboardUI;
     BootScreen bootUI;
@@ -79,15 +81,13 @@ private:
     void processDisplayRender();
     static void displayUpdateTask(void* parameters);
     void processDisplayUpdates();
-
-    static void flush_cb(lv_disp_drv_t* disp_drv, const lv_area_t* area, lv_color_t* color_p);
     void updateDashboardValues();
 
     struct DisplayUpdateCommand {
         enum class CommandType {
             UPDATE_DISPLAY,
         };
-        
+
         CommandType type;
         float temperature;
         uint8_t currentSpeed;
@@ -116,15 +116,32 @@ private:
 
     QueueHandle_t DisplayUpdateCommandQueue;
 
-    lv_obj_t* currentScreen;  // Keep track of active screen
-    bool needsScreenTransition = false;
-    
-    // Add these new methods
-    void initializeBootScreen();
+    lv_obj_t* currentScreen;
+    bool needsScreenTransition;
 
     void showComponentStatus(const char* component, 
-                           BootScreen::ComponentStatus status,
-                           const char* detail);
+                             BootScreen::ComponentStatus status,
+                             const char* detail);
+
+    uint32_t lastActivityTime;
+    bool screenOn;
+    void updateActivityTime();
+    void checkScreenTimeout();
+    void handleScreenPowerChange(bool on);
+
+    QueueHandle_t displayEventQueue;
+    
+    enum class DisplayEvent {
+        BUTTON_PRESS,
+        CHECK_TIMEOUT
+    };
+
+    struct DisplayEventMessage {
+        DisplayEvent event;
+    };
+
+    static constexpr uint32_t DISPLAY_EVENT_QUEUE_SIZE = 10;
+
 };
 
 #endif // DISPLAY_MANAGER_H

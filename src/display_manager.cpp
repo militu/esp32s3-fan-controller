@@ -16,6 +16,10 @@ DisplayManager::DisplayManager(TaskManager& tm, TempSensor& ts, FanController& f
     , mqttManager(mm)
     , driver(nullptr)
     , initialized(false)
+    , needsScreenTransition(false)
+    , lastActivityTime(0)
+    , screenOn(false)
+    , displayEventQueue(nullptr)
 {
 }
 
@@ -27,80 +31,54 @@ bool DisplayManager::begin(DisplayDriver* displayDriver) {
         return false;
     }
 
-    driver = displayDriver;
-    if (!driver->begin()) {
+    this->driver = displayDriver;
+
+    if (!this->driver->begin()) {
         DEBUG_LOG_DISPLAY("DisplayManager: Driver initialization failed");
         return false;
     }
 
-    // Create queue first
     DisplayUpdateCommandQueue = xQueueCreate(Config::Display::DisplayUpdate::Queue::SIZE, sizeof(DisplayUpdateCommand));
     if (!DisplayUpdateCommandQueue) {
         DEBUG_LOG_DISPLAY("DisplayManager: Queue creation failed");
         return false;
     }
 
-    // Initialize LVGL
-    lv_init();
-
-    // Allocate display buffers
-    static uint32_t buf_size = driver->width() * 40;
-    static lv_disp_draw_buf_t draw_buf;
-    static lv_color_t *buf1 = (lv_color_t *)heap_caps_malloc(
-        buf_size * sizeof(lv_color_t), MALLOC_CAP_DMA);
-    static lv_color_t *buf2 = (lv_color_t *)heap_caps_malloc(
-        buf_size * sizeof(lv_color_t), MALLOC_CAP_DMA);
-
-    if (!buf1 || !buf2) {
-        DEBUG_LOG_DISPLAY("DisplayManager: Buffer allocation failed");
+    displayEventQueue = xQueueCreate(DISPLAY_EVENT_QUEUE_SIZE, sizeof(DisplayEventMessage));
+    if (!displayEventQueue) {
+        DEBUG_LOG_DISPLAY("Failed to create display event queue");
         return false;
     }
 
-    lv_disp_draw_buf_init(&draw_buf, buf1, buf2, buf_size);
+    screenOn = true;
+    lastActivityTime = millis();
 
-    // Configure display driver
-    static lv_disp_drv_t disp_drv;
-    lv_disp_drv_init(&disp_drv);
-    disp_drv.hor_res = driver->width();
-    disp_drv.ver_res = driver->height();
-    disp_drv.flush_cb = flush_cb;
-    disp_drv.draw_buf = &draw_buf;
-    disp_drv.user_data = this;
-    disp_drv.full_refresh = 0;
-
-    if (!lv_disp_drv_register(&disp_drv)) {
-        DEBUG_LOG_DISPLAY("DisplayManager: Driver registration failed");
-        return false;
-    }
-
-    // Initialize UI components
     bootUI.init(driver->width(), driver->height());
     dashboardUI.init(driver->width(), driver->height());
 
     currentState = DisplayState::BOOT;
     bootUI.begin();
 
-    // Create LVGL task with adjusted parameters
-    TaskManager::TaskConfig renderConfig{
+    TaskManager::TaskConfig renderConfig {
         "DisplayRender",
         Config::Display::DisplayRender::STACK_SIZE,
         Config::Display::DisplayRender::TASK_PRIORITY,
         Config::Display::DisplayRender::TASK_CORE
     };
-    
+
     esp_err_t err = taskManager.createTask(renderConfig, displayRenderTask, this);
     if (err != ESP_OK) {
         DEBUG_LOG_DISPLAY("DisplayManager: DisplayRender task creation failed with error %d", err);
         return false;
     }
 
-    TaskManager::TaskConfig updateConfig{
+    TaskManager::TaskConfig updateConfig {
         "DisplayUpdate",
         Config::Display::DisplayUpdate::STACK_SIZE,
         Config::Display::DisplayUpdate::TASK_PRIORITY,
         Config::Display::DisplayUpdate::TASK_CORE
     };
-    
+
     err = taskManager.createTask(updateConfig, displayUpdateTask, this);
     if (err != ESP_OK) {
         DEBUG_LOG_DISPLAY("DisplayManager: DisplayUpdate task creation failed with error %d", err);
@@ -112,10 +90,9 @@ bool DisplayManager::begin(DisplayDriver* displayDriver) {
     return true;
 }
 
-void DisplayManager::initializeBootScreen() {
-    bootUI.begin();
-    lv_scr_load(bootUI.getScreen());
-}
+/*******************************************************************************
+ * Tasks
+ ******************************************************************************/
 
 void DisplayManager::displayRenderTask(void* parameters) {
     DisplayManager* display = static_cast<DisplayManager*>(parameters);
@@ -127,10 +104,9 @@ void DisplayManager::displayUpdateTask(void* parameters) {
     display->processDisplayUpdates();
 }
 
-
 void DisplayManager::processDisplayRender() {
     TickType_t xLastWakeTime = xTaskGetTickCount();
-    
+
     while (true) {
         {
             MutexGuard guard(dashboardUI.getUIMutex(), pdMS_TO_TICKS(10));
@@ -138,7 +114,7 @@ void DisplayManager::processDisplayRender() {
                 lv_timer_handler();
             }
         }
-        
+
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1));
     }
 }
@@ -148,6 +124,27 @@ void DisplayManager::processDisplayUpdates() {
     DisplayUpdateCommand cmd;
     
     while (true) {
+        // Check for display events
+        DisplayEventMessage event;
+        while (xQueueReceive(displayEventQueue, &event, 0) == pdTRUE) {
+                switch (event.event) {
+                    case DisplayEvent::BUTTON_PRESS:
+                        if (!screenOn) {
+                            handleScreenPowerChange(true);
+                        } else {
+                            updateActivityTime();
+                        }
+                        break;
+                }
+        }
+
+        // Check screen timeout periodically
+        static uint32_t lastTimeoutCheck = 0;
+        uint32_t now = millis();
+        if (now - lastTimeoutCheck >= 1000) {  // Check every second
+            lastTimeoutCheck = now;
+            checkScreenTimeout();
+        }
         // Handle screen transition if needed
         if (needsScreenTransition) {
             DEBUG_LOG_DISPLAY("Executing screen transition to dashboard");
@@ -160,7 +157,7 @@ void DisplayManager::processDisplayUpdates() {
         switch (currentState) {
             case DisplayState::BOOT:
                 break;
-                
+
             case DisplayState::DASHBOARD:
                 // Process any pending UI commands
                 while (xQueueReceive(DisplayUpdateCommandQueue, &cmd, 0) == pdTRUE) {
@@ -185,15 +182,15 @@ void DisplayManager::processDisplayUpdates() {
                 }
                 break;
         }
-        
+
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(Config::Display::DisplayRender::TASK_DELAY));
     }
 }
 
 void DisplayManager::switchToDashboardUI() {
     DEBUG_LOG_DISPLAY("Attempting to switch to dashboard. Initialized: %d, Current State: %d", 
-            initialized, static_cast<int>(currentState));
-    
+                     initialized, static_cast<int>(currentState));
+
     if (!initialized) {
         DEBUG_LOG_DISPLAY("Cannot switch to dashboard - not initialized");
         return;
@@ -215,19 +212,16 @@ void DisplayManager::switchToDashboardUI() {
     updateDashboardValues();
     DEBUG_LOG_DISPLAY("Dashboard switch requested");
 }
-    
+
 void DisplayManager::updateBootStatus(const char* component, BootScreen::ComponentStatus status) {
-if (!initialized || currentState != DisplayState::BOOT) return;
-
-bootUI.updateStatus(component, status);
-
+    if (!initialized || currentState != DisplayState::BOOT) return;
+    bootUI.updateStatus(component, status);
 }
 
 void DisplayManager::updateBootStatusDetail(const char* component, 
                                           BootScreen::ComponentStatus status,
                                           const char* detail) {
     if (!initialized || currentState != DisplayState::BOOT) return;
-    
     bootUI.updateStatusWithDetail(component, status, detail);
 }
 
@@ -261,10 +255,12 @@ void DisplayManager::showComponentStatus(const char* component,
     updateBootStatusDetail(component, status, detail);
 }
 
-// WiFi Methods
+/*******************************************************************************
+ * Wifi
+ ******************************************************************************/
+
 void DisplayManager::showWifiInitializing() {
-    showComponentStatus("WiFi", BootScreen::ComponentStatus::WORKING, 
-                       "Starting initialization...");
+    showComponentStatus("WiFi", BootScreen::ComponentStatus::WORKING, "Starting initialization...");
 }
 
 void DisplayManager::showWifiConnecting(uint8_t attempt, uint8_t maxAttempts) {
@@ -285,16 +281,19 @@ void DisplayManager::showWifiFailed(const char* reason) {
     showComponentStatus("WiFi", BootScreen::ComponentStatus::FAILED, reason);
 }
 
-// NTP Methods
+/*******************************************************************************
+ * NTP
+ ******************************************************************************/
+
 void DisplayManager::showNTPInitializing() {
     showComponentStatus("NTP", BootScreen::ComponentStatus::WORKING, 
-                       "Starting time service...");
+                        "Starting time service...");
 }
 
 void DisplayManager::showNTPSyncing(uint8_t attempt, uint8_t maxAttempts) {
     char detail[64];
     snprintf(detail, sizeof(detail), "Synchronizing time (Attempt %d/%d)...", 
-            attempt, maxAttempts);
+             attempt, maxAttempts);
     showComponentStatus("NTP", BootScreen::ComponentStatus::WORKING, detail);
 }
 
@@ -308,33 +307,101 @@ void DisplayManager::showNTPFailed(const char* reason) {
     showComponentStatus("NTP", BootScreen::ComponentStatus::FAILED, reason);
 }
 
-// MQTT Methods
+/*******************************************************************************
+ * MQTT
+ ******************************************************************************/
+
 void DisplayManager::showMQTTInitializing() {
     showComponentStatus("MQTT", BootScreen::ComponentStatus::WORKING, 
-                       "Starting MQTT service...");
+                        "Starting MQTT service...");
 }
 
 void DisplayManager::showMQTTConnecting(uint8_t attempt, uint8_t maxAttempts) {
     char detail[64];
     snprintf(detail, sizeof(detail), "Connecting to broker (Attempt %d/%d)...", 
-            attempt, maxAttempts);
+             attempt, maxAttempts);
     showComponentStatus("MQTT", BootScreen::ComponentStatus::WORKING, detail);
 }
 
 void DisplayManager::showMQTTConnected() {
     showComponentStatus("MQTT", BootScreen::ComponentStatus::SUCCESS, 
-                       "Connected to broker");
+                        "Connected to broker");
 }
 
 void DisplayManager::showMQTTFailed(const char* reason) {
     showComponentStatus("MQTT", BootScreen::ComponentStatus::FAILED, reason);
 }
 
-void DisplayManager::flush_cb(lv_disp_drv_t* disp_drv, const lv_area_t* area, lv_color_t* color_p) {
-    DisplayManager* display = static_cast<DisplayManager*>(disp_drv->user_data);
-    if (display && display->driver) {
-        display->driver->flush(area, (uint8_t*)color_p);
-        lv_disp_flush_ready(disp_drv);
+/*******************************************************************************
+ * Screen timeout
+ ******************************************************************************/
+
+void DisplayManager::updateActivityTime() {
+    if (!initialized || !driver) return;
+    
+    if (driver->lockUI(pdMS_TO_TICKS(100))) {
+        lastActivityTime = millis();
+        driver->unlockUI();
     }
 }
 
+void DisplayManager::checkScreenTimeout() {
+    DEBUG_LOG_DISPLAY("Checking screen timeout...");
+    
+    if (!initialized || !driver) {
+        DEBUG_LOG_DISPLAY("Skipping timeout check - not initialized (init: %d, driver: %p)", 
+                         initialized, driver);
+        return;
+    }
+    
+    if (driver->lockUI(pdMS_TO_TICKS(100))) {
+        DEBUG_LOG_DISPLAY("UI lock acquired for timeout check");
+        uint32_t currentTime = millis();
+        DEBUG_LOG_DISPLAY("Current time: %lu, Last activity: %lu, Diff: %lu, Timeout: %lu, Screen state: %s", 
+                         currentTime, lastActivityTime, 
+                         currentTime - lastActivityTime,
+                         Config::Display::Sleep::SCREEN_TIMEOUT_MS,
+                         screenOn ? "ON" : "OFF");
+        
+        if (screenOn && (currentTime - lastActivityTime >= Config::Display::Sleep::SCREEN_TIMEOUT_MS)) {
+            DEBUG_LOG_DISPLAY("Timeout reached - turning screen off");
+            handleScreenPowerChange(false);
+        }
+        
+        driver->unlockUI();
+        DEBUG_LOG_DISPLAY("UI lock released after timeout check");
+    } else {
+        DEBUG_LOG_DISPLAY("Failed to acquire UI lock for timeout check");
+    }
+}
+
+void DisplayManager::handleScreenPowerChange(bool on) {
+    if (!initialized || !driver) {
+        DEBUG_LOG_DISPLAY("Cannot change screen power - not initialized");
+        return;
+    }
+    
+    DEBUG_LOG_DISPLAY("Screen power state changing to: %s", on ? "ON" : "OFF");
+    screenOn = on;  // Set the state BEFORE calling setPower
+    driver->setPower(on);
+    
+    if (on) {
+        lastActivityTime = millis();
+        DEBUG_LOG_DISPLAY("Activity timer reset to: %lu", lastActivityTime);
+    }
+    
+    DEBUG_LOG_DISPLAY("Screen power state is now: %s", screenOn ? "ON" : "OFF");
+
+}
+
+void DisplayManager::handleButtonPress() {
+    if (!initialized || !displayEventQueue) {
+        DEBUG_LOG_DISPLAY("Cannot handle button press - not initialized");
+        return;
+    }
+
+    DisplayEventMessage msg{DisplayEvent::BUTTON_PRESS};
+    if (xQueueSend(displayEventQueue, &msg, pdMS_TO_TICKS(100)) != pdTRUE) {
+        DEBUG_LOG_DISPLAY("Failed to queue button press event");
+    }
+}
