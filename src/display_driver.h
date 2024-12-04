@@ -30,9 +30,21 @@ public:
     // Retrieves the current power state
     DisplayHardware::PowerState getPowerState() const;
 
+    bool lockUI(TickType_t timeout = portMAX_DELAY) {
+        return uiMutex ? (xSemaphoreTake(uiMutex, timeout) == pdTRUE) : false;
+    }
+    
+    void unlockUI() {
+        if (uiMutex) {
+            xSemaphoreGive(uiMutex);
+        }
+    }
+
 private:
     DisplayHardware* hardware;  // Pointer to an instance of DisplayHardware
     bool initialized;           // Flag to track initialization status
+    SemaphoreHandle_t uiMutex;
+
 };
 
 // Factory function to create the appropriate DisplayDriver

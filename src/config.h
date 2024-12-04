@@ -10,6 +10,20 @@
 
 namespace Config {
     /**
+     * @brief Hardware-specific configuration settings
+     */
+    namespace Hardware {
+        #ifdef USE_LILYGO_S3
+            constexpr uint8_t PIN_BUTTON_1 = 0;
+            constexpr uint8_t PIN_BUTTON_2 = 14;
+        #else  // ILI9341 hardware
+            constexpr uint8_t PIN_BUTTON_1 = 0;
+            constexpr uint8_t PIN_BUTTON_2 = 7;
+        #endif
+    }
+
+
+    /**
      * @brief System-wide configuration settings
      */
     namespace System {
@@ -209,6 +223,10 @@ namespace Config {
      * @brief Display configuration
      */
     namespace Display {
+
+        namespace Sleep {
+            constexpr uint32_t SCREEN_TIMEOUT_MS = 5 * 60 * 1000;  // 5 minutes
+        }
 
         namespace DisplayRender {
             constexpr uint32_t STACK_SIZE = 4096;

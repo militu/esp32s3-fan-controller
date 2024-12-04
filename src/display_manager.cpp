@@ -16,7 +16,10 @@ DisplayManager::DisplayManager(TaskManager& tm, TempSensor& ts, FanController& f
     , mqttManager(mm)
     , driver(nullptr)
     , initialized(false)
-    , needsScreenTransition(false) // Initialize screen transition flag
+    , needsScreenTransition(false)
+    , lastActivityTime(0)
+    , screenOn(false)
+    , displayEventQueue(nullptr)
 {
 }
 
@@ -40,6 +43,15 @@ bool DisplayManager::begin(DisplayDriver* displayDriver) {
         DEBUG_LOG_DISPLAY("DisplayManager: Queue creation failed");
         return false;
     }
+
+    displayEventQueue = xQueueCreate(DISPLAY_EVENT_QUEUE_SIZE, sizeof(DisplayEventMessage));
+    if (!displayEventQueue) {
+        DEBUG_LOG_DISPLAY("Failed to create display event queue");
+        return false;
+    }
+
+    screenOn = true;
+    lastActivityTime = millis();
 
     bootUI.init(driver->width(), driver->height());
     dashboardUI.init(driver->width(), driver->height());
@@ -112,6 +124,27 @@ void DisplayManager::processDisplayUpdates() {
     DisplayUpdateCommand cmd;
     
     while (true) {
+        // Check for display events
+        DisplayEventMessage event;
+        while (xQueueReceive(displayEventQueue, &event, 0) == pdTRUE) {
+                switch (event.event) {
+                    case DisplayEvent::BUTTON_PRESS:
+                        if (!screenOn) {
+                            handleScreenPowerChange(true);
+                        } else {
+                            updateActivityTime();
+                        }
+                        break;
+                }
+        }
+
+        // Check screen timeout periodically
+        static uint32_t lastTimeoutCheck = 0;
+        uint32_t now = millis();
+        if (now - lastTimeoutCheck >= 1000) {  // Check every second
+            lastTimeoutCheck = now;
+            checkScreenTimeout();
+        }
         // Handle screen transition if needed
         if (needsScreenTransition) {
             DEBUG_LOG_DISPLAY("Executing screen transition to dashboard");
@@ -297,4 +330,78 @@ void DisplayManager::showMQTTConnected() {
 
 void DisplayManager::showMQTTFailed(const char* reason) {
     showComponentStatus("MQTT", BootScreen::ComponentStatus::FAILED, reason);
+}
+
+/*******************************************************************************
+ * Screen timeout
+ ******************************************************************************/
+
+void DisplayManager::updateActivityTime() {
+    if (!initialized || !driver) return;
+    
+    if (driver->lockUI(pdMS_TO_TICKS(100))) {
+        lastActivityTime = millis();
+        driver->unlockUI();
+    }
+}
+
+void DisplayManager::checkScreenTimeout() {
+    DEBUG_LOG_DISPLAY("Checking screen timeout...");
+    
+    if (!initialized || !driver) {
+        DEBUG_LOG_DISPLAY("Skipping timeout check - not initialized (init: %d, driver: %p)", 
+                         initialized, driver);
+        return;
+    }
+    
+    if (driver->lockUI(pdMS_TO_TICKS(100))) {
+        DEBUG_LOG_DISPLAY("UI lock acquired for timeout check");
+        uint32_t currentTime = millis();
+        DEBUG_LOG_DISPLAY("Current time: %lu, Last activity: %lu, Diff: %lu, Timeout: %lu, Screen state: %s", 
+                         currentTime, lastActivityTime, 
+                         currentTime - lastActivityTime,
+                         Config::Display::Sleep::SCREEN_TIMEOUT_MS,
+                         screenOn ? "ON" : "OFF");
+        
+        if (screenOn && (currentTime - lastActivityTime >= Config::Display::Sleep::SCREEN_TIMEOUT_MS)) {
+            DEBUG_LOG_DISPLAY("Timeout reached - turning screen off");
+            handleScreenPowerChange(false);
+        }
+        
+        driver->unlockUI();
+        DEBUG_LOG_DISPLAY("UI lock released after timeout check");
+    } else {
+        DEBUG_LOG_DISPLAY("Failed to acquire UI lock for timeout check");
+    }
+}
+
+void DisplayManager::handleScreenPowerChange(bool on) {
+    if (!initialized || !driver) {
+        DEBUG_LOG_DISPLAY("Cannot change screen power - not initialized");
+        return;
+    }
+    
+    DEBUG_LOG_DISPLAY("Screen power state changing to: %s", on ? "ON" : "OFF");
+    screenOn = on;  // Set the state BEFORE calling setPower
+    driver->setPower(on);
+    
+    if (on) {
+        lastActivityTime = millis();
+        DEBUG_LOG_DISPLAY("Activity timer reset to: %lu", lastActivityTime);
+    }
+    
+    DEBUG_LOG_DISPLAY("Screen power state is now: %s", screenOn ? "ON" : "OFF");
+
+}
+
+void DisplayManager::handleButtonPress() {
+    if (!initialized || !displayEventQueue) {
+        DEBUG_LOG_DISPLAY("Cannot handle button press - not initialized");
+        return;
+    }
+
+    DisplayEventMessage msg{DisplayEvent::BUTTON_PRESS};
+    if (xQueueSend(displayEventQueue, &msg, pdMS_TO_TICKS(100)) != pdTRUE) {
+        DEBUG_LOG_DISPLAY("Failed to queue button press event");
+    }
 }

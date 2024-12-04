@@ -2,9 +2,18 @@
 
 
 DisplayDriver::DisplayDriver(DisplayHardware* hw) 
-    : hardware(hw), initialized(false) {}
+    : hardware(hw)
+    , initialized(false) {
+    uiMutex = xSemaphoreCreateMutex();
+    if (!uiMutex) {
+        Serial.println("Failed to create UI mutex!");
+    }
+}
 
 DisplayDriver::~DisplayDriver() { 
+    if (uiMutex) {
+        vSemaphoreDelete(uiMutex);
+    }
     delete hardware; 
 }
 

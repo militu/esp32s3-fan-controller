@@ -62,13 +62,7 @@ void ILI9341Hardware::setPower(bool on) {
 }
 
 void ILI9341Hardware::setBrightness(uint8_t level) {
-    Serial.printf("Setting brightness to: %d\n", level);
-    // Test with digital write first
-    if (level > 127) {
-        digitalWrite(Pins::BL, HIGH);
-    } else {
-        digitalWrite(Pins::BL, LOW);
-    }
+    analogWrite(Pins::BL, level);
 }
 
 void ILI9341Hardware::flush(const Rect& area, lv_color_t* pixels) {

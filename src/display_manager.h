@@ -60,6 +60,8 @@ public:
     void showMQTTConnected();
     void showMQTTFailed(const char* reason);
 
+    void handleButtonPress();
+
 private:
     TaskManager& taskManager;
     TempSensor& tempSensor;
@@ -117,11 +119,29 @@ private:
     lv_obj_t* currentScreen;
     bool needsScreenTransition;
 
-    void initializeBootScreen();
-
     void showComponentStatus(const char* component, 
                              BootScreen::ComponentStatus status,
                              const char* detail);
+
+    uint32_t lastActivityTime;
+    bool screenOn;
+    void updateActivityTime();
+    void checkScreenTimeout();
+    void handleScreenPowerChange(bool on);
+
+    QueueHandle_t displayEventQueue;
+    
+    enum class DisplayEvent {
+        BUTTON_PRESS,
+        CHECK_TIMEOUT
+    };
+
+    struct DisplayEventMessage {
+        DisplayEvent event;
+    };
+
+    static constexpr uint32_t DISPLAY_EVENT_QUEUE_SIZE = 10;
+
 };
 
 #endif // DISPLAY_MANAGER_H

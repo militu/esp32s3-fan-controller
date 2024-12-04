@@ -22,11 +22,14 @@ FanController fanController(taskManager, configPreference);
 MqttManager mqttManager(taskManager, tempSensor, fanController);
 DisplayManager displayManager(taskManager, tempSensor, fanController, wifiManager, mqttManager);
 
-// Constants
-const int BUTTON_PIN = 7;
+// Button
 
-// OneButton instance
 OneButton button;
+struct ButtonParams {
+    DisplayDriver* driver;
+    DisplayManager* displayManager;
+};
+static ButtonParams buttonParams;
 
 void performSystemHealthCheck();
 
@@ -46,32 +49,36 @@ void setup() {
         return;
     }
 
+    // Initialize first
     SystemInitializer initializer(
         taskManager, displayManager, displayDriver,
         wifiManager, ntpManager, mqttManager,
         tempSensor, fanController, configPreference
     );
 
-    SystemInitializer::InitConfig config(true); // false = Perform network initialization
+    SystemInitializer::InitConfig config(false); // false = Perform network initialization
 
     if (!initializer.initialize(config)) {
         Serial.println("System initialization failed!");
         return;
     }
 
-    // Button setup
-    button.setup(BUTTON_PIN, INPUT_PULLUP, true);
+    // Add a delay before button setup
+    delay(100);
+ 
+    // Initialize the button params after creating components
+    buttonParams = ButtonParams{displayDriver, &displayManager};
 
-    // Use parameterizedCallbackFunction for lambda with capture
+    // Setup button with the static params
+    button.setup(Config::Hardware::PIN_BUTTON_1, INPUT_PULLUP, true);
+    button.setDebounceMs(50);
+    button.setClickMs(50);
+
     button.attachClick([](void* ctx) {
-        Serial.println("Button Press Detected"); // Debug to ensure the click handler is executed
-        auto* driver = static_cast<DisplayDriver*>(ctx);
-        if (driver->getPowerState() == DisplayHardware::PowerState::ON) {
-            driver->setPower(false);
-        } else {
-            driver->setPower(true);
-        }
-    }, displayDriver);
+        Serial.println("Button Press Detected");
+        auto* params = static_cast<ButtonParams*>(ctx);
+        params->displayManager->handleButtonPress();
+    }, &buttonParams);
 
     Serial.println("System initialization complete!");
 }
