@@ -41,7 +41,12 @@ bool LilygoHardware::initialize() {
     disp_drv.ver_res = config.height;
     disp_drv.flush_cb = [](lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *color_p) {
         LilygoHardware *instance = static_cast<LilygoHardware *>(drv->user_data);
-        instance->flush({area->x1, area->y1, area->x2, area->y2}, color_p);
+        instance->flush({
+            static_cast<uint16_t>(area->x1),
+            static_cast<uint16_t>(area->y1),
+            static_cast<uint16_t>(area->x2),
+            static_cast<uint16_t>(area->y2)
+        }, color_p);
     };
     disp_drv.draw_buf = &draw_buf;
     disp_drv.user_data = this;
