@@ -23,6 +23,8 @@ protected:
     void enterSleep() override;
     void wakeFromSleep() override;
     void sendCommand(uint8_t cmd) override;
+    void enterDeepSleep() override;
+    void wakeFromDeepSleep() override;
 
 private:
     LilygoHardware();

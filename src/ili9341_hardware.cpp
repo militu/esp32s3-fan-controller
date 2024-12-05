@@ -76,27 +76,25 @@ void ILI9341Hardware::flush(const Rect& area, lv_color_t* pixels) {
     lv_disp_flush_ready(&disp_drv);
 }
 
-// void ILI9341Hardware::powerOn() {
-//     sendCommand(SLPOUT_COMMAND);
-//     delay(120);
-//     sendCommand(DISPON_COMMAND);
-// }
+void ILI9341Hardware::sendCommand(uint8_t cmd) {
+    tft->startWrite();
+    tft->writeCommand(cmd);
+    tft->endWrite();
+}
 
-// For testing purpose on wokwi
+// The following methods are not working on Wokwi simulation
 void ILI9341Hardware::powerOn() {
-    setBrightness(255);  // Full brightness
+    sendCommand(SLPOUT_COMMAND);
+    delay(120);
+    sendCommand(DISPON_COMMAND);
 }
 
-// void ILI9341Hardware::powerOff() {
-//     sendCommand(DISPOFF_COMMAND);
-//     delay(120);
-//     sendCommand(SLPIN_COMMAND);
-// }
-
-// For testing purpose on wokwi
 void ILI9341Hardware::powerOff() {
-    setBrightness(0);
+    sendCommand(DISPOFF_COMMAND);
+    delay(120);
+    sendCommand(SLPIN_COMMAND);
 }
+
 
 void ILI9341Hardware::enterSleep() {
     sendCommand(SLPIN_COMMAND);
@@ -108,8 +106,38 @@ void ILI9341Hardware::wakeFromSleep() {
     delay(120);
 }
 
-void ILI9341Hardware::sendCommand(uint8_t cmd) {
-    tft->startWrite();
-    tft->writeCommand(cmd);
-    tft->endWrite();
+void ILI9341Hardware::enterDeepSleep() {
+    // Send display to sleep
+    sendCommand(SLPIN_COMMAND);
+    delay(5);
+
+    // Power down display
+    digitalWrite(Pins::BL, LOW);  // Turn off backlight
+    digitalWrite(Pins::CS, HIGH); // Deselect display
+    digitalWrite(Pins::DC, LOW);  // Command mode
+
+    // Configure wake-up source (Button 0)
+    esp_sleep_enable_ext0_wakeup((gpio_num_t)getWakeButtonPin(), 0);
+    
+    // Enter deep sleep
+    esp_deep_sleep_start();
+}
+
+void ILI9341Hardware::wakeFromDeepSleep() {
+    // Initialize SPI again since it was powered down
+    SPI.begin();
+    SPI.setFrequency(40000000);
+    SPI.setDataMode(SPI_MODE0);
+    SPI.setBitOrder(MSBFIRST);
+
+    // Wake display
+    sendCommand(SLPOUT_COMMAND);
+    delay(120);  // Required delay after sleep out
+
+    // Restore backlight
+    digitalWrite(Pins::BL, HIGH);
+
+    // Re-initialize display if needed
+    tft->setRotation(1);
+    tft->fillScreen(0); // Clear screen
 }
