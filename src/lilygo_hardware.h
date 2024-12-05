@@ -2,6 +2,7 @@
 #define LILYGO_HARDWARE_H
 
 #include "display_hardware.h"
+#include "config.h"
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_vendor.h>
 #include <esp_lcd_panel_ops.h>
@@ -14,8 +15,8 @@ public:
     void setBrightness(uint8_t level) override;
     void flush(const Rect& area, lv_color_t* pixels) override;
     const DisplayConfig& getConfig() const override { return config; }
-    uint8_t getSleepButtonPin() const override { return 0; }
-    uint8_t getWakeButtonPin() const override { return 14; }
+    uint8_t getSleepButtonPin() const override { return Config::Hardware::PIN_BUTTON_1; }
+    uint8_t getWakeButtonPin() const override { return Config::Hardware::PIN_BUTTON_2; }
 
 protected:
     void powerOn() override;
