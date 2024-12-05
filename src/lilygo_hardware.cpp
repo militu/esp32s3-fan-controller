@@ -59,8 +59,37 @@ void LilygoHardware::setPower(bool on) {
     on ? powerOn() : powerOff();
 }
 
-void LilygoHardware::setBrightness(uint8_t level) {
-    ledcWrite(0, level);
+void LilygoHardware::setBrightness(uint8_t value) {
+    static uint8_t level = 0;
+    static uint8_t steps = 16;
+    
+    // Turn off backlight if brightness is 0
+    if (value == 0) {
+        digitalWrite(Pins::BL, 0);
+        delay(3);
+        level = 0;
+        return;
+    }
+    
+    // Initialize backlight if it was off
+    if (level == 0) {
+        digitalWrite(Pins::BL, 1);
+        level = steps;
+        delayMicroseconds(30);
+    }
+    
+    // Calculate required pulses for desired brightness
+    int from = steps - level;
+    int to = steps - value;
+    int num = (steps + to - from) % steps;
+    
+    // Generate pulses to adjust brightness
+    for (int i = 0; i < num; i++) {
+        digitalWrite(Pins::BL, 0);
+        digitalWrite(Pins::BL, 1);
+    }
+    
+    level = value;
 }
 
 void LilygoHardware::flush(const Rect& area, lv_color_t* pixels) {
@@ -88,6 +117,35 @@ void LilygoHardware::enterSleep() {
 void LilygoHardware::wakeFromSleep() {
     sendCommand(PanelCommands::SLPOUT);
     delay(120);
+}
+
+void LilygoHardware::enterDeepSleep() {
+    // Send display to sleep
+    sendCommand(PanelCommands::SLPIN);
+    delay(5);
+    
+    // Power down display
+    digitalWrite(Pins::POWER, LOW);
+    digitalWrite(Pins::BL, LOW);
+    
+    // Configure wake-up source (button 2)
+    esp_sleep_enable_ext0_wakeup((gpio_num_t)getWakeButtonPin(), 0);
+    
+    // Enter deep sleep
+    esp_deep_sleep_start();
+}
+
+void LilygoHardware::wakeFromDeepSleep() {
+    // Restore power
+    digitalWrite(Pins::POWER, HIGH);
+    
+    // Wake display
+    sendCommand(PanelCommands::SLPOUT);
+    delay(120);
+    
+    // Restore backlight
+    digitalWrite(Pins::BL, HIGH);
+    setBrightness(255); // Or last saved brightness level
 }
 
 void LilygoHardware::sendCommand(uint8_t cmd) {

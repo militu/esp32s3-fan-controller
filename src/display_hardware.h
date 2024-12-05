@@ -50,14 +50,13 @@ public:
     
 protected:
 
-    
     virtual void powerOn() = 0;
     virtual void powerOff() = 0;
     virtual void enterSleep() = 0;
     virtual void wakeFromSleep() = 0;
     virtual void sendCommand(uint8_t cmd) = 0;
-
-    void handlePowerTransition(PowerState newState);
+    virtual void enterDeepSleep();
+    virtual void wakeFromDeepSleep();
 };
 
 #endif // DISPLAY_HARDWARE_H

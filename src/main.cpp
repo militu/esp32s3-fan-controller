@@ -34,6 +34,12 @@ static ButtonParams buttonParams;
 void performSystemHealthCheck();
 
 void setup() {
+    // Set power pin first thing, important for LilyGo on battery
+    #ifdef USE_LILYGO_S3
+        pinMode(PIN_POWER_ON, OUTPUT);
+        digitalWrite(PIN_POWER_ON, HIGH);
+    #endif
+
     Serial.begin(115200);
     delay(1000);
     Serial.println("\nESP32 System Starting...");
