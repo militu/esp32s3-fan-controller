@@ -14,9 +14,11 @@ namespace Config {
      */
     namespace Hardware {
         #ifdef USE_LILYGO_S3
+            constexpr uint8_t PIN_POWER_ON = 15;  // LilyGo power pin
             constexpr uint8_t PIN_BUTTON_1 = 0;
             constexpr uint8_t PIN_BUTTON_2 = 14;
         #else  // ILI9341 hardware
+            constexpr uint8_t PIN_POWER_ON = 15;  // Adjust this value for your ILI9341 setup if needed
             constexpr uint8_t PIN_BUTTON_1 = 0;
             constexpr uint8_t PIN_BUTTON_2 = 7;
         #endif

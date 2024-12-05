@@ -1,3 +1,5 @@
+#ifndef USE_LILYGO_S3
+
 #include "ili9341_hardware.h"
 #include <lvgl.h>
 
@@ -141,3 +143,5 @@ void ILI9341Hardware::wakeFromDeepSleep() {
     tft->setRotation(1);
     tft->fillScreen(0); // Clear screen
 }
+
+#endif // USE_LILYGO_S3

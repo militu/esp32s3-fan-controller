@@ -2,8 +2,12 @@
 #define DISPLAY_DRIVER_H
 
 #include "display_hardware.h"
-#include "ili9341_hardware.h"
+
+#ifdef USE_LILYGO_S3
 #include "lilygo_hardware.h"
+#else
+#include "ili9341_hardware.h"
+#endif
 
 class DisplayDriver {
 public:

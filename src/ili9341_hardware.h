@@ -1,6 +1,8 @@
 #ifndef ILI9341_HARDWARE_H
 #define ILI9341_HARDWARE_H
 
+#ifndef USE_LILYGO_S3
+
 #include "display_hardware.h"
 #include <Adafruit_ILI9341.h>
 #include <SPI.h>
@@ -49,4 +51,5 @@ private:
     lv_disp_drv_t disp_drv;
 };
 
+#endif // USE_LILYGO_S3
 #endif // ILI9341_HARDWARE_H
