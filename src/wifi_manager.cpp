@@ -1,5 +1,3 @@
-#define DEBUG_LOG(msg, ...) if (Config::System::Debug::WIFI) { Serial.printf(msg "\n", ##__VA_ARGS__); }
-
 #include "wifi_manager.h"
 
 /*******************************************************************************
@@ -16,7 +14,7 @@ WifiManager::WifiManager(TaskManager& tm)
     , wasConnected(false) 
 {
     if (!mutex) {
-        DEBUG_LOG("WifiManager - Mutex creation failed!");
+        DEBUG_LOG_WIFI("WifiManager - Mutex creation failed!");
     }
 }
 
@@ -31,7 +29,7 @@ WifiManager::~WifiManager() {
  ******************************************************************************/
 
 esp_err_t WifiManager::begin() {
-    DEBUG_LOG("WiFi Manager Starting...");
+    DEBUG_LOG_WIFI("WiFi Manager Starting...");
 
     if (!mutex) {
         return ESP_ERR_NO_MEM;
@@ -59,12 +57,12 @@ esp_err_t WifiManager::begin() {
     }
 
     initialized = true;
-    DEBUG_LOG("WiFi Manager initialized successfully");
+    DEBUG_LOG_WIFI("WiFi Manager initialized successfully");
     return ESP_OK;
 }
 
 esp_err_t WifiManager::connect() {
-    DEBUG_LOG("Connecting to WiFi SSID: %s\n", Config::WiFi::SSID);
+    DEBUG_LOG_WIFI("Connecting to WiFi SSID: %s\n", Config::WiFi::SSID);
 
     MutexGuard guard(mutex);
     if (!guard.isLocked()) {
@@ -99,7 +97,7 @@ void WifiManager::processUpdate() {
             
             if (connectionAttempts >= Config::WiFi::MAX_RETRIES) {
                 updateState(Config::System::State::WIFI_ERROR);
-                DEBUG_LOG("WiFi connection failed after max attempts");
+                DEBUG_LOG_WIFI("WiFi connection failed after max attempts");
                 return;
             }
 
@@ -109,7 +107,7 @@ void WifiManager::processUpdate() {
             lastAttemptTime = currentTime;
             connectionAttempts++;
             
-            DEBUG_LOG("Starting connection attempt %d/%d", connectionAttempts, Config::WiFi::MAX_RETRIES);
+            DEBUG_LOG_WIFI("Starting connection attempt %d/%d", connectionAttempts, Config::WiFi::MAX_RETRIES);
         }
         
         // Check connection status
@@ -118,12 +116,12 @@ void WifiManager::processUpdate() {
                 currentState = Config::System::State::WIFI_CONNECTED;
                 wasConnected = true;
                 attemptInProgress = false;
-                DEBUG_LOG("WiFi connected! IP: %s", WiFi.localIP().toString().c_str());
+                DEBUG_LOG_WIFI("WiFi connected! IP: %s", WiFi.localIP().toString().c_str());
             } else if (currentTime - lastAttemptTime >= Config::WiFi::RETRY_DELAY_MS) {
                 // Attempt timed out
                 attemptInProgress = false;
                 currentRetryDelay *= Config::WiFi::BACKOFF_FACTOR;
-                DEBUG_LOG("Connection attempt %d failed, next delay: %lu ms", 
+                DEBUG_LOG_WIFI("Connection attempt %d failed, next delay: %lu ms", 
                          connectionAttempts, currentRetryDelay);
             }
         }
@@ -133,7 +131,7 @@ void WifiManager::processUpdate() {
     if (currentTime - lastCheckTime >= Config::WiFi::CONNECTION_CHECK_INTERVAL_MS) {
         lastCheckTime = currentTime;
         if (WiFi.status() != WL_CONNECTED && currentState != Config::System::State::WIFI_CONNECTING) {
-            DEBUG_LOG("WiFi connection lost. Reconnecting...");
+            DEBUG_LOG_WIFI("WiFi connection lost. Reconnecting...");
             WiFi.disconnect();
             connect();
         }
@@ -175,7 +173,7 @@ void WifiManager::wifiTask(void* parameters) {
     
     // Initial connection attempt
     if (wifi->connect() != ESP_OK) {
-        DEBUG_LOG("Initial WiFi connection failed");
+        DEBUG_LOG_WIFI("Initial WiFi connection failed");
     }
     
     // Main task loop

@@ -1,5 +1,3 @@
-#define DEBUG_LOG(msg, ...) if (Config::System::Debug::NTP) { Serial.printf(msg "\n", ##__VA_ARGS__); }
-
 #include "ntp_manager.h"
 #include <sys/time.h>
 
@@ -17,7 +15,7 @@ NTPManager::NTPManager(TaskManager& tm)
     , syncAttempts(0)
 {
     if (!mutex) {
-        DEBUG_LOG("NTPManager - Mutex creation failed!");
+        DEBUG_LOG_NTP("NTPManager - Mutex creation failed!");
     }
 }
 
@@ -32,7 +30,7 @@ NTPManager::~NTPManager() {
  ******************************************************************************/
 
 esp_err_t NTPManager::begin() {
-    DEBUG_LOG("NTP Manager Starting...");
+    DEBUG_LOG_NTP("NTP Manager Starting...");
 
     if (!mutex) {
         return ESP_ERR_NO_MEM;
@@ -49,7 +47,7 @@ esp_err_t NTPManager::begin() {
     // - Base timezone is CET (UTC+1)
     // - CEST starts on the last Sunday of March
     // - CEST ends on the last Sunday of October at 3:00
-    DEBUG_LOG("Configuring NTP with server: %s", Config::NTP::SERVER);
+    DEBUG_LOG_NTP("Configuring NTP with server: %s", Config::NTP::SERVER);
     configTime(0, 0, Config::NTP::SERVER, Config::NTP::BACKUP_SERVER);
     setenv("TZ", "CET-1CEST,M3.5.0,M10.5.0/3", 1);
     tzset();
@@ -62,12 +60,12 @@ esp_err_t NTPManager::begin() {
     esp_err_t err = taskManager.createTask(taskConfig, ntpTask, this);
     
     if (err != ESP_OK) {
-        DEBUG_LOG("Failed to create NTP task: %d", err);
+        DEBUG_LOG_NTP("Failed to create NTP task: %d", err);
         return err;
     }
 
     initialized = true;
-    DEBUG_LOG("NTP Manager initialized successfully");
+    DEBUG_LOG_NTP("NTP Manager initialized successfully");
     return ESP_OK;
 }
 
@@ -89,7 +87,7 @@ void NTPManager::processUpdate() {
             (currentTime - lastAttemptTime >= currentRetryDelay || lastAttemptTime == 0)) {
             
             if (syncAttempts >= Config::NTP::MAX_SYNC_ATTEMPTS) {
-                DEBUG_LOG("NTP sync failed after max attempts");
+                DEBUG_LOG_NTP("NTP sync failed after max attempts");
                 return;
             }
 
@@ -98,7 +96,7 @@ void NTPManager::processUpdate() {
             lastAttemptTime = currentTime;
             syncAttempts++;
             
-            DEBUG_LOG("Starting NTP sync attempt %d/%d", 
+            DEBUG_LOG_NTP("Starting NTP sync attempt %d/%d", 
                         syncAttempts, Config::NTP::MAX_SYNC_ATTEMPTS);
             
             struct tm timeinfo;
@@ -111,7 +109,7 @@ void NTPManager::processUpdate() {
                 
                 char timeStr[32];
                 strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", &timeinfo);
-                DEBUG_LOG("Time synchronized successfully: %s", timeStr);
+                DEBUG_LOG_NTP("Time synchronized successfully: %s", timeStr);
             }
         }
         
@@ -120,14 +118,14 @@ void NTPManager::processUpdate() {
             (currentTime - lastAttemptTime >= Config::NTP::SYNC_TIMEOUT_MS)) {
             attemptInProgress = false;
             currentRetryDelay *= Config::NTP::BACKOFF_FACTOR;
-            DEBUG_LOG("Sync attempt %d failed, next delay: %lu ms", 
+            DEBUG_LOG_NTP("Sync attempt %d failed, next delay: %lu ms", 
                         syncAttempts, currentRetryDelay);
         }
     }
 }
 
 bool NTPManager::forceSync() {
-    DEBUG_LOG("Force sync requested");
+    DEBUG_LOG_NTP("Force sync requested");
     
     MutexGuard guard(mutex);
     if (!guard.isLocked()) return false;
@@ -142,13 +140,13 @@ bool NTPManager::forceSync() {
 }
 
 bool NTPManager::syncTime() {
-DEBUG_LOG("Starting time synchronization (attempt %d)...", syncAttempts + 1);
+DEBUG_LOG_NTP("Starting time synchronization (attempt %d)...", syncAttempts + 1);
 
 MutexGuard guard(mutex);
 if (!guard.isLocked()) return false;
 
 if (syncAttempts >= Config::NTP::MAX_SYNC_ATTEMPTS) {
-    DEBUG_LOG("Maximum sync attempts reached");
+    DEBUG_LOG_NTP("Maximum sync attempts reached");
     return false;
 }
 
@@ -163,10 +161,10 @@ if (success) {
     
     char timeStr[32];
     strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", &timeinfo);
-    DEBUG_LOG("Time synchronized successfully: %s", timeStr);
+    DEBUG_LOG_NTP("Time synchronized successfully: %s", timeStr);
 } else {
     syncAttempts++;
-    DEBUG_LOG("Sync attempt failed (%d/%d)", syncAttempts, Config::NTP::MAX_SYNC_ATTEMPTS);
+    DEBUG_LOG_NTP("Sync attempt failed (%d/%d)", syncAttempts, Config::NTP::MAX_SYNC_ATTEMPTS);
 }
 
 return success;
@@ -179,14 +177,14 @@ return success;
 int NTPManager::getCurrentHour() const {
     MutexGuard guard(mutex);
     if (!guard.isLocked() || !timeSynchronized) {
-        DEBUG_LOG("Cannot get current hour - %s", 
+        DEBUG_LOG_NTP("Cannot get current hour - %s", 
                  !guard.isLocked() ? "mutex lock failed" : "time not synchronized");
         return -1;
     }
 
     struct tm timeinfo;
     if (!getLocalTime(&timeinfo)) {
-        DEBUG_LOG("Failed to get local time");
+        DEBUG_LOG_NTP("Failed to get local time");
         return -1;
     }
 
@@ -227,14 +225,14 @@ bool NTPManager::isTimeSynchronized() const {
 void NTPManager::ntpTask(void* parameters) {
     NTPManager* ntp = static_cast<NTPManager*>(parameters);
     
-    DEBUG_LOG("NTP task started");
+    DEBUG_LOG_NTP("NTP task started");
     
     // Initial delay to allow WiFi to connect
     vTaskDelay(pdMS_TO_TICKS(5000));
     
     // Initial sync attempt
     if (!ntp->syncTime()) {
-        DEBUG_LOG("Initial time sync failed, will retry in background");
+        DEBUG_LOG_NTP("Initial time sync failed, will retry in background");
     }
     
     while (true) {
