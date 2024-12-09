@@ -31,7 +31,7 @@ FanController::FanController(TaskManager& tm, ConfigPreference& config)
         .minRPM = Config::Fan::RPM::MINIMUM,
         .nightStartHour = Config::Fan::NightMode::START_HOUR,
         .nightEndHour = Config::Fan::NightMode::END_HOUR,
-        .testMode = true     // Enable test mode for Wokwi
+        .testMode = false     // Enable test mode for Wokwi
     }
     , mode(Mode::AUTO)
     , status(Status::OK)
@@ -474,11 +474,72 @@ uint8_t FanController::calculateSpeedForTemperature(float temp) const {
 }
 
 uint8_t FanController::SpeedToRawPWM(uint8_t percent) const {
-    return map(constrain(percent, 0, 100), 0, 100, config.minPWM, config.maxPWM);
+    // No PWM below minimum speed to prevent unwanted rotation
+    if (percent < config.minSpeed) return 0;
+    
+    // Calibration table based on measurements
+    const struct {
+        uint8_t speed;
+        uint8_t pwm;
+    } calibration[] = {
+        {0, 0},      // Explicit zero point
+        {5, 25},     // Minimum speed
+        {10, 37},
+        {20, 61},
+        {30, 85},
+        {40, 109},
+        {50, 134},
+        {60, 158},
+        {70, 182},
+        {80, 206},
+        {90, 230},
+        {100, 255}
+    };
+    
+    // Find the calibration points to interpolate between
+    size_t i;
+    for (i = 0; i < sizeof(calibration)/sizeof(calibration[0]) - 1; i++) {
+        if (percent <= calibration[i + 1].speed) break;
+    }
+    
+    // Linear interpolation between calibration points
+    float t = (percent - calibration[i].speed) / 
+              float(calibration[i + 1].speed - calibration[i].speed);
+    return calibration[i].pwm + t * (calibration[i + 1].pwm - calibration[i].pwm);
 }
 
-uint8_t FanController::rawPWMToSpeed(uint8_t raw) const {
-    return map(raw, config.minPWM, config.maxPWM, 0, 100);
+uint8_t FanController::rawPWMToSpeed(uint8_t pwm) const {
+    if (pwm < config.minPWM) return 0;
+    
+    // Calibration table (same as above but we'll interpolate PWM to speed)
+    const struct {
+        uint8_t pwm;
+        uint8_t speed;
+    } calibration[] = {
+        {0, 0},
+        {25, 5},
+        {37, 10},
+        {61, 20},
+        {85, 30},
+        {109, 40},
+        {134, 50},
+        {158, 60},
+        {182, 70},
+        {206, 80},
+        {230, 90},
+        {255, 100}
+    };
+    
+    // Find the calibration points to interpolate between
+    size_t i;
+    for (i = 0; i < sizeof(calibration)/sizeof(calibration[0]) - 1; i++) {
+        if (pwm <= calibration[i + 1].pwm) break;
+    }
+    
+    // Linear interpolation between calibration points
+    float t = (pwm - calibration[i].pwm) / 
+              float(calibration[i + 1].pwm - calibration[i].pwm);
+    return calibration[i].speed + t * (calibration[i + 1].speed - calibration[i].speed);
 }
 
 /*******************************************************************************

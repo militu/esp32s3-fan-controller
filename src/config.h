@@ -96,7 +96,11 @@ namespace Config {
      * @brief Temperature sensor configuration
      */
     namespace Temperature {
-        constexpr uint8_t SENSOR_PIN = 14;
+        #ifdef USE_LILYGO_S3
+            constexpr uint8_t SENSOR_PIN = 16;
+        #else  // ILI9341 hardware
+            constexpr uint8_t SENSOR_PIN = 14;
+        #endif
         constexpr uint32_t READ_INTERVAL_MS = 2000;      // 2 seconds
         constexpr uint8_t MAX_RETRIES = 3;
         constexpr uint8_t SMOOTH_SAMPLES = 5;         // Rolling average samples
@@ -116,7 +120,7 @@ namespace Config {
     namespace Fan {
         namespace PWM {
             constexpr uint8_t PWM_PIN = 17;
-            constexpr uint8_t TACH_PIN = 16;
+            constexpr uint8_t TACH_PIN = 21;
             constexpr uint32_t FREQUENCY = 25000;     // 25kHz
             constexpr uint8_t RESOLUTION = 8;         // 8-bit
             constexpr uint8_t CHANNEL = 0;
@@ -130,7 +134,7 @@ namespace Config {
         }
 
         namespace RPM {
-            constexpr uint16_t MINIMUM = 300;
+            constexpr uint16_t MINIMUM = 200;
             constexpr uint16_t MAXIMUM = 3300;
             constexpr uint8_t PULSES_PER_REV = 2;
             constexpr uint32_t UPDATE_INTERVAL = 1000;  // 1 second

@@ -63,8 +63,7 @@ void TaskManager::stop() {
  ******************************************************************************/
 
 esp_err_t TaskManager::createTask(const TaskConfig& config, TaskFunction_t function, void* parameters) {
-    // Validate initialization state
-    if (!initialized || !mutex) {
+    if (!initialized || !mutex || !function) {
         return ESP_ERR_INVALID_STATE;
     }
 

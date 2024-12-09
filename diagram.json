@@ -86,7 +86,7 @@
     ["r1:1", "temp1:DQ", "gold", ["v28.8", "h-86.4"]],
     ["r1:2", "temp1:VCC", "red", ["h0"]],
     ["esp:14", "temp1:DQ", "gold", ["h0"]],
-    ["fan1:A", "esp:17", "blue", ["v0"]],
+    ["fan1:A", "esp:21", "blue", ["v0"]],
     ["fan1:C", "r2:1", "black", ["v0"]],
     ["r2:2", "esp:GND.4", "black", ["v0"]],
     ["esp:33", "rl:1", "green", ["v0"]],

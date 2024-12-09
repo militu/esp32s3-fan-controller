@@ -20,6 +20,7 @@ bool LilygoHardware::initialize() {
     digitalWrite(Pins::POWER, HIGH);
     pinMode(Pins::RD, OUTPUT);
     digitalWrite(Pins::RD, HIGH);
+    setBrightness(255); // Or last saved brightness level
 
     if (!initializeBus() || !initializePanel() || !configureDisplay()) {
         return false;

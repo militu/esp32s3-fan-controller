@@ -51,6 +51,9 @@ esp_err_t TempSensor::begin() {
         return ESP_ERR_NO_MEM;
     }
 
+    // Add delay to let display SPI initialize first
+    delay(300);
+
     // Initialize the Dallas temperature sensor
     sensors.begin();
     sensors.setWaitForConversion(false);  // Enable async reading

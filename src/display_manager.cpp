@@ -33,6 +33,13 @@ bool DisplayManager::begin(DisplayDriver* displayDriver) {
 
     this->driver = displayDriver;
 
+    // Add debug for successful driver init
+    Serial.println("Display driver set");
+
+    // Initialize LVGL before creating queues
+    lv_init();
+    Serial.println("LVGL initialized");
+    
     if (!this->driver->begin()) {
         DEBUG_LOG_DISPLAY("DisplayManager: Driver initialization failed");
         return false;
@@ -108,11 +115,18 @@ void DisplayManager::processDisplayRender() {
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
     while (true) {
+        bool locked = false;
         {
-            MutexGuard guard(dashboardUI.getUIMutex(), pdMS_TO_TICKS(10));
-            if (guard.isLocked()) {
+            MutexGuard guard(dashboardUI.getUIMutex(), pdMS_TO_TICKS(100));
+            locked = guard.isLocked();
+            if (locked) {
                 lv_timer_handler();
             }
+        }
+        
+        // Add delay if mutex failed
+        if (!locked) {
+            vTaskDelay(pdMS_TO_TICKS(10));
         }
 
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1));
