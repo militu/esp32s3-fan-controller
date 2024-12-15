@@ -47,8 +47,28 @@ DashboardScreen::~DashboardScreen() {
 void DashboardScreen::begin() {
     if (initialized) return;
     
-    // Create the screen first but don't load it yet
-    createMainScreen();
+    DEBUG_LOG_DISPLAY("Starting dashboard UI initialization with dimensions: %dx%d", 
+                     displayWidth, displayHeight);
+
+    // Create and load the new screen
+    screen = lv_disp_get_scr_act(NULL);  // Get the currently active screen
+    if (!screen) {
+        // Only create new if no screen exists
+        screen = lv_obj_create(NULL);
+        lv_obj_set_scrollbar_mode(screen, LV_SCROLLBAR_MODE_OFF);
+        
+        // Match boot screen's gradient background
+        lv_obj_set_style_bg_color(screen, lv_color_hex(0x101020), LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_grad_color(screen, lv_color_hex(0x202040), LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_grad_dir(screen, LV_GRAD_DIR_VER, LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, LV_STATE_DEFAULT);
+    } else {
+        // Clean existing screen
+        lv_obj_clean(screen);
+    }
+    
+    // Add small delay to ensure LVGL internals are ready
+    delay(10);
     
     // Calculate base dimensions and spacing
     uint16_t margin = displayWidth * Config::Display::Dashboard::MARGIN_TO_WIDTH_RATIO;
@@ -63,7 +83,9 @@ void DashboardScreen::begin() {
     
     // Create main content
     createMainContent(contentStartY, contentHeight);
-    
+ 
+    lv_timer_handler();
+
     // Make sure all animations are stopped and initial values are set
     tempAnimationInProgress = false;
     currentSpeedAnimationInProgress = false;
@@ -81,6 +103,7 @@ void DashboardScreen::begin() {
 void DashboardScreen::init(uint16_t width, uint16_t height) {
     displayWidth = width;
     displayHeight = height;
+    DEBUG_LOG_DISPLAY("Dashboard screen initialized with dimensions: %dx%d", width, height);
 }
 
 void DashboardScreen::update(float temp, int fanSpeed, int targetSpeed, FanController::Mode mode,
@@ -133,6 +156,11 @@ void DashboardScreen::createTopStatusBar(uint16_t height) {
 
 void DashboardScreen::createMainScreen() {
     screen = lv_obj_create(NULL);
+    if (!screen) {
+        DEBUG_LOG_DISPLAY("Failed to create screen object");
+        return;
+    }
+
     lv_obj_set_scrollbar_mode(screen, LV_SCROLLBAR_MODE_OFF);
     
     // Match boot screen's gradient background

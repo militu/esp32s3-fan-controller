@@ -32,20 +32,16 @@ bool DisplayManager::begin(DisplayDriver* displayDriver) {
     }
 
     this->driver = displayDriver;
-
-    // Add debug for successful driver init
-    Serial.println("Display driver set");
-
-    // Initialize LVGL before creating queues
-    lv_init();
-    Serial.println("LVGL initialized");
+    DEBUG_LOG_DISPLAY("Display driver set");
     
     if (!this->driver->begin()) {
         DEBUG_LOG_DISPLAY("DisplayManager: Driver initialization failed");
         return false;
     }
 
-    DisplayUpdateCommandQueue = xQueueCreate(Config::Display::DisplayUpdate::Queue::SIZE, sizeof(DisplayUpdateCommand));
+    // Create queues...
+    DisplayUpdateCommandQueue = xQueueCreate(Config::Display::DisplayUpdate::Queue::SIZE, 
+                                           sizeof(DisplayUpdateCommand));
     if (!DisplayUpdateCommandQueue) {
         DEBUG_LOG_DISPLAY("DisplayManager: Queue creation failed");
         return false;
@@ -63,9 +59,13 @@ bool DisplayManager::begin(DisplayDriver* displayDriver) {
     bootUI.init(driver->width(), driver->height());
     dashboardUI.init(driver->width(), driver->height());
 
+    // Make sure we're in a clean state before creating first screen
+    lv_timer_handler();
+    
     currentState = DisplayState::BOOT;
     bootUI.begin();
 
+    // Create render task last
     TaskManager::TaskConfig renderConfig {
         "DisplayRender",
         Config::Display::DisplayRender::STACK_SIZE,
