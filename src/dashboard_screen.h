@@ -23,13 +23,14 @@ public:
 
     // Screen initialization
     void init(uint16_t width, uint16_t height);
-    void begin();
+    bool begin();
 
     // Core display interface
     void update(float temp, int fanSpeed, int targetSpeed, FanController::Mode mode,
                bool wifiConnected, bool mqttConnected, bool nightModeEnabled, bool nightModeActive);
     lv_obj_t* getScreen() { return screen; }
     SemaphoreHandle_t getUIMutex() const { return uiMutex; }
+    bool isInitialized() const;
 
 private:
     // Constants for FontAwesome icons

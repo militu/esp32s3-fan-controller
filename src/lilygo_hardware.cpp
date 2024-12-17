@@ -282,26 +282,3 @@ bool LilygoHardware::configureDisplay() {
 
     return true;
 }
-
-// void LilygoHardware::prepareForSwitch() {
-//     if (!panelHandle || !ioHandle) return;
-    
-//     // Disable panel operations
-//     esp_lcd_panel_disp_off(panelHandle, true);
-//     delay(10);
-    
-//     // Re-initialize panel with known good state
-//     esp_lcd_panel_reset(panelHandle);
-//     delay(20);  // Give more time for reset
-    
-//     // Reinitialize display settings
-//     esp_lcd_panel_init(panelHandle);
-//     esp_lcd_panel_invert_color(panelHandle, true);
-//     esp_lcd_panel_swap_xy(panelHandle, true);
-//     esp_lcd_panel_mirror(panelHandle, false, true);
-//     esp_lcd_panel_set_gap(panelHandle, 0, 35);
-    
-//     // Re-enable panel
-//     esp_lcd_panel_disp_off(panelHandle, false);
-//     delay(10);
-// }

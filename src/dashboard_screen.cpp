@@ -44,47 +44,28 @@ DashboardScreen::~DashboardScreen() {
  * Core UI Management
  ******************************************************************************/
 
-void DashboardScreen::begin() {
-    if (initialized) return;
+bool DashboardScreen::begin() {
+    DEBUG_LOG_DISPLAY("Dashboard begin entry - Task: 0x%lx", (unsigned long)xTaskGetCurrentTaskHandle());
     
-    DEBUG_LOG_DISPLAY("Starting dashboard UI initialization with dimensions: %dx%d", 
-                     displayWidth, displayHeight);
-
-    // Create and load the new screen
-    screen = lv_disp_get_scr_act(NULL);  // Get the currently active screen
-    if (!screen) {
-        // Only create new if no screen exists
-        screen = lv_obj_create(NULL);
-        lv_obj_set_scrollbar_mode(screen, LV_SCROLLBAR_MODE_OFF);
-        
-        // Match boot screen's gradient background
-        lv_obj_set_style_bg_color(screen, lv_color_hex(0x101020), LV_STATE_DEFAULT);
-        lv_obj_set_style_bg_grad_color(screen, lv_color_hex(0x202040), LV_STATE_DEFAULT);
-        lv_obj_set_style_bg_grad_dir(screen, LV_GRAD_DIR_VER, LV_STATE_DEFAULT);
-        lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, LV_STATE_DEFAULT);
-    } else {
-        // Clean existing screen
-        lv_obj_clean(screen);
+    if (initialized) {
+        DEBUG_LOG_DISPLAY("Dashboard already initialized");
+        return true;
     }
     
-    // Add small delay to ensure LVGL internals are ready
-    delay(10);
-    
-    // Calculate base dimensions and spacing
+    // Create the screen
+    createMainScreen();
+    if (!screen) {
+        DEBUG_LOG_DISPLAY("Failed to create main screen");
+        return false;
+    }
+
+    // Calculate dimensions
     uint16_t margin = displayWidth * Config::Display::Dashboard::MARGIN_TO_WIDTH_RATIO;
     uint16_t topBarHeight = displayHeight * Config::Display::Dashboard::TopBar::HEIGHT_TO_SCREEN_RATIO;
     
-    // Create all UI elements
+    // Create UI elements
     createTopStatusBar(topBarHeight);
-    
-    // Calculate main content area dimensions
-    uint16_t contentStartY = topBarHeight + margin;
-    uint16_t contentHeight = displayHeight - contentStartY - margin;
-    
-    // Create main content
-    createMainContent(contentStartY, contentHeight);
- 
-    lv_timer_handler();
+    createMainContent(topBarHeight + margin, displayHeight - topBarHeight - margin * 2);
 
     // Make sure all animations are stopped and initial values are set
     tempAnimationInProgress = false;
@@ -92,12 +73,16 @@ void DashboardScreen::begin() {
     currentTempValue = 0;
     targetSpeedValue = 0;
     
-    delay(1000);  // Give LVGL time to finish any pending operations
-    // Now that everything is initialized, load the screen
+    // Wait for any pending LVGL operations
+    delay(10);
+
+    // Load the screen
     lv_scr_load(screen);
+    delay(50); // Give time for the screen to load
     
-    // Mark as initialized after screen is loaded
     initialized = true;
+    DEBUG_LOG_DISPLAY("Dashboard initialization complete");
+    return true;
 }
 
 void DashboardScreen::init(uint16_t width, uint16_t height) {
@@ -114,6 +99,12 @@ void DashboardScreen::update(float temp, int fanSpeed, int targetSpeed, FanContr
     updateStatusIndicators(wifiConnected, mqttConnected, nightModeEnabled, nightModeActive);
     updateSpeedDisplay(fanSpeed, targetSpeed);
     updateModeDisplay(mode);
+}
+
+bool DashboardScreen::isInitialized() const {
+    MutexGuard guard(uiMutex);
+    if (!guard.isLocked()) return false;
+    return initialized && screen != nullptr;
 }
 
 /*******************************************************************************
@@ -164,8 +155,8 @@ void DashboardScreen::createMainScreen() {
     lv_obj_set_scrollbar_mode(screen, LV_SCROLLBAR_MODE_OFF);
     
     // Match boot screen's gradient background
-    lv_obj_set_style_bg_color(screen, lv_color_hex(0x101020), LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_grad_color(screen, lv_color_hex(0x202040), LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(screen, lv_color_hex(DisplayColors::BG_DARK), LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_grad_color(screen, lv_color_hex(DisplayColors::BG_LIGHT), LV_STATE_DEFAULT);
     lv_obj_set_style_bg_grad_dir(screen, LV_GRAD_DIR_VER, LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, LV_STATE_DEFAULT);
 }
