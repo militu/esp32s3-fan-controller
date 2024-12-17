@@ -46,7 +46,7 @@ namespace Config {
             constexpr bool FAN = false;
             constexpr bool MAIN = false;
             constexpr bool MQTT = false;
-            constexpr bool SCREEN = true; // NOT DISPLAY because of conflict
+            constexpr bool SCREEN = false; // NOT DISPLAY because of conflict
             constexpr bool TASK_MANAGER = false;
             constexpr bool NTP = false;
             constexpr bool INITIALIZER = false;
