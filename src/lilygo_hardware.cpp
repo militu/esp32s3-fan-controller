@@ -1,5 +1,4 @@
 #include "lilygo_hardware.h"
-#include <driver/ledc.h>
 
 static bool lvgl_flush_ready_cb(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_io_event_data_t *edata, void *user_ctx) {
     lv_disp_drv_t* disp_drv = (lv_disp_drv_t*)user_ctx;
@@ -20,15 +19,12 @@ bool LilygoHardware::initialize() {
     digitalWrite(Pins::POWER, HIGH);
     pinMode(Pins::RD, OUTPUT);
     digitalWrite(Pins::RD, HIGH);
-    setBrightness(255); // Or last saved brightness level
+    pinMode(Pins::BL, OUTPUT);
+    setBrightness(16); // Or last saved brightness level
 
     if (!initializeBus() || !initializePanel() || !configureDisplay()) {
         return false;
     }
-
-    ledcSetup(0, 10000, 8);
-    ledcAttachPin(Pins::BL, 0);
-    ledcWrite(0, 255);
 
     static bool lvgl_initialized = false;
     if (!lvgl_initialized) {
@@ -183,7 +179,7 @@ void LilygoHardware::wakeFromDeepSleep() {
     
     // Restore backlight
     digitalWrite(Pins::BL, HIGH);
-    setBrightness(255); // Or last saved brightness level
+    setBrightness(16); // Or last saved brightness level
 }
 
 void LilygoHardware::sendCommand(uint8_t cmd) {
