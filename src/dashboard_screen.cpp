@@ -361,9 +361,6 @@ lv_obj_t* DashboardScreen::createStatusLabel(lv_obj_t* parent, lv_align_t align,
  ******************************************************************************/
 
 void DashboardScreen::updateTemperatureDisplay(float temp) {
-    MutexGuard guard(uiMutex, pdMS_TO_TICKS(10));
-    if (!guard.isLocked()) return;
-
     int targetValue = constrain((int)(temp * 2), 
         Config::Display::Dashboard::Meters::Temperature::MIN_TEMP * 2,
         Config::Display::Dashboard::Meters::Temperature::MAX_TEMP * 2);
@@ -406,8 +403,6 @@ void DashboardScreen::updateTemperatureDisplay(float temp) {
 
 void DashboardScreen::updateStatusIndicators(bool wifiConnected, bool mqttConnected, 
                                              bool nightModeEnabled, bool nightModeActive) {
-    MutexGuard guard(uiMutex, pdMS_TO_TICKS(10));
-    if (!guard.isLocked()) return;
 
     // Update WiFi status with proper colors
     lv_obj_set_style_text_color(wifiLabel, 
@@ -433,9 +428,6 @@ void DashboardScreen::updateStatusIndicators(bool wifiConnected, bool mqttConnec
 }
 
 void DashboardScreen::updateSpeedDisplay(int fanSpeed, int targetSpeed) {
-    MutexGuard guard(uiMutex, pdMS_TO_TICKS(10));
-    if (!guard.isLocked()) return;
-
     if (!currentSpeedAnimationInProgress && fanSpeed != currentSpeedValue) {
         lv_anim_t anim;
         lv_anim_init(&anim);
@@ -487,9 +479,6 @@ void DashboardScreen::updateSpeedDisplay(int fanSpeed, int targetSpeed) {
 }
 
 void DashboardScreen::updateModeDisplay(FanController::Mode mode) {
-    MutexGuard guard(uiMutex, pdMS_TO_TICKS(10));
-    if (!guard.isLocked()) return;
-    
     lv_label_set_text(modeIndicator, mode == FanController::Mode::AUTO ? "AUTO" : "MANUAL");
     lv_obj_set_style_text_color(modeIndicator, 
         mode == FanController::Mode::AUTO ? lv_color_hex(DisplayColors::SUCCESS) : lv_color_hex(DisplayColors::TEMP_WARNING),
