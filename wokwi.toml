@@ -3,3 +3,6 @@
 version = 1
 firmware = '.pio/build/ili9341/firmware.bin'
 elf = '.pio/build/ili9341/firmware.elf'
+
+[net]
+gateway="ws://localhost:9011"

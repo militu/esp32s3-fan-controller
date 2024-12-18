@@ -1,5 +1,4 @@
 #include "lilygo_hardware.h"
-#include <driver/ledc.h>
 
 static bool lvgl_flush_ready_cb(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_io_event_data_t *edata, void *user_ctx) {
     lv_disp_drv_t* disp_drv = (lv_disp_drv_t*)user_ctx;
@@ -20,22 +19,44 @@ bool LilygoHardware::initialize() {
     digitalWrite(Pins::POWER, HIGH);
     pinMode(Pins::RD, OUTPUT);
     digitalWrite(Pins::RD, HIGH);
+    pinMode(Pins::BL, OUTPUT);
+    setBrightness(16); // Or last saved brightness level
 
     if (!initializeBus() || !initializePanel() || !configureDisplay()) {
         return false;
     }
 
-    ledcSetup(0, 10000, 8);
-    ledcAttachPin(Pins::BL, 0);
-    ledcWrite(0, 255);
+    static bool lvgl_initialized = false;
+    if (!lvgl_initialized) {
+        lv_init();
+        lvgl_initialized = true;
+    }
 
-    lv_init();
 
+    // Create TWO draw buffers to ensure smooth transitions
     static lv_disp_draw_buf_t draw_buf;
-    static lv_color_t *buf1 = (lv_color_t *)heap_caps_malloc(config.width * 40 * sizeof(lv_color_t), MALLOC_CAP_DMA);
+    const uint32_t buf_size = config.width * 10;  // Reduce buffer size
+    
+    static lv_color_t *buf1 = (lv_color_t *)heap_caps_malloc(
+        buf_size * sizeof(lv_color_t), 
+        MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL
+    );
+    
+    static lv_color_t *buf2 = (lv_color_t *)heap_caps_malloc(
+        buf_size * sizeof(lv_color_t), 
+        MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL
+    );
 
-    lv_disp_draw_buf_init(&draw_buf, buf1, nullptr, config.width * 40);
+    if (!buf1 || !buf2) {
+        if (buf1) heap_caps_free(buf1);
+        if (buf2) heap_caps_free(buf2);
+        return false;
+    }
 
+    // Initialize with double buffering
+    lv_disp_draw_buf_init(&draw_buf, buf1, buf2, buf_size);
+
+    // Configure display driver
     lv_disp_drv_init(&disp_drv);
     disp_drv.hor_res = config.width;
     disp_drv.ver_res = config.height;
@@ -48,8 +69,12 @@ bool LilygoHardware::initialize() {
             static_cast<uint16_t>(area->y2)
         }, color_p);
     };
+    
+    // Reduce DMA transfer settings
     disp_drv.draw_buf = &draw_buf;
     disp_drv.user_data = this;
+    disp_drv.sw_rotate = 1;  // Use software rotation
+    
     lv_disp_drv_register(&disp_drv);
 
     return true;
@@ -94,7 +119,16 @@ void LilygoHardware::setBrightness(uint8_t value) {
 
 void LilygoHardware::flush(const Rect& area, lv_color_t* pixels) {
     if (!panelHandle) return;
+    
+    // Add synchronization delay
+    static uint32_t last_flush = 0;
+    uint32_t now = millis();
+    if (now - last_flush < 2) {  // 2ms minimum between flushes
+        delay(2);
+    }
+    
     esp_lcd_panel_draw_bitmap(panelHandle, area.x1, area.y1, area.x2 + 1, area.y2 + 1, pixels);
+    last_flush = millis();
 }
 
 void LilygoHardware::powerOn() {
@@ -145,7 +179,7 @@ void LilygoHardware::wakeFromDeepSleep() {
     
     // Restore backlight
     digitalWrite(Pins::BL, HIGH);
-    setBrightness(255); // Or last saved brightness level
+    setBrightness(16); // Or last saved brightness level
 }
 
 void LilygoHardware::sendCommand(uint8_t cmd) {

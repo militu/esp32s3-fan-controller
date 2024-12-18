@@ -32,13 +32,16 @@ bool DisplayManager::begin(DisplayDriver* displayDriver) {
     }
 
     this->driver = displayDriver;
-
+    DEBUG_LOG_DISPLAY("Display driver set");
+    
     if (!this->driver->begin()) {
         DEBUG_LOG_DISPLAY("DisplayManager: Driver initialization failed");
         return false;
     }
 
-    DisplayUpdateCommandQueue = xQueueCreate(Config::Display::DisplayUpdate::Queue::SIZE, sizeof(DisplayUpdateCommand));
+    // Create queues...
+    DisplayUpdateCommandQueue = xQueueCreate(Config::Display::DisplayUpdate::Queue::SIZE, 
+                                           sizeof(DisplayUpdateCommand));
     if (!DisplayUpdateCommandQueue) {
         DEBUG_LOG_DISPLAY("DisplayManager: Queue creation failed");
         return false;
@@ -56,9 +59,13 @@ bool DisplayManager::begin(DisplayDriver* displayDriver) {
     bootUI.init(driver->width(), driver->height());
     dashboardUI.init(driver->width(), driver->height());
 
+    // Make sure we're in a clean state before creating first screen
+    lv_timer_handler();
+    
     currentState = DisplayState::BOOT;
     bootUI.begin();
 
+    // Create render task last
     TaskManager::TaskConfig renderConfig {
         "DisplayRender",
         Config::Display::DisplayRender::STACK_SIZE,
@@ -108,11 +115,23 @@ void DisplayManager::processDisplayRender() {
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
     while (true) {
-        {
-            MutexGuard guard(dashboardUI.getUIMutex(), pdMS_TO_TICKS(10));
-            if (guard.isLocked()) {
-                lv_timer_handler();
+        // Don't try to render during transitions
+        if (!needsScreenTransition) {
+            bool locked = false;
+            {
+                MutexGuard guard(dashboardUI.getUIMutex(), pdMS_TO_TICKS(100));
+                locked = guard.isLocked();
+                if (locked) {
+                    lv_timer_handler();
+                }
             }
+            
+            if (!locked) {
+                vTaskDelay(pdMS_TO_TICKS(10));
+            }
+        } else {
+            DEBUG_LOG_DISPLAY("Render task skipping due to transition");
+            vTaskDelay(pdMS_TO_TICKS(10));
         }
 
         vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1));
@@ -124,18 +143,20 @@ void DisplayManager::processDisplayUpdates() {
     DisplayUpdateCommand cmd;
     
     while (true) {
+        taskManager.updateTaskRunTime("DisplayUpdate");
+
         // Check for display events
         DisplayEventMessage event;
         while (xQueueReceive(displayEventQueue, &event, 0) == pdTRUE) {
-                switch (event.event) {
-                    case DisplayEvent::BUTTON_PRESS:
-                        if (!screenOn) {
-                            handleScreenPowerChange(true);
-                        } else {
-                            updateActivityTime();
-                        }
-                        break;
-                }
+            switch (event.event) {
+                case DisplayEvent::BUTTON_PRESS:
+                    if (!screenOn) {
+                        handleScreenPowerChange(true);
+                    } else {
+                        updateActivityTime();
+                    }
+                    break;
+            }
         }
 
         // Check screen timeout periodically
@@ -145,37 +166,103 @@ void DisplayManager::processDisplayUpdates() {
             lastTimeoutCheck = now;
             checkScreenTimeout();
         }
+
         // Handle screen transition if needed
         if (needsScreenTransition) {
             DEBUG_LOG_DISPLAY("Executing screen transition to dashboard");
-            dashboardUI.begin();
+
+            // Get the current screen and invalidate it to stop rendering
+            lv_obj_t* current_screen = lv_scr_act();
+            if (current_screen) {
+                lv_obj_invalidate(current_screen);
+            }
+
+            vTaskDelay(pdMS_TO_TICKS(50));
+
+            // Take the dashboard UI mutex first and hold it through the entire transition
+            MutexGuard uiGuard(dashboardUI.getUIMutex(), pdMS_TO_TICKS(1000));
+            if (!uiGuard.isLocked()) {
+                DEBUG_LOG_DISPLAY("Failed to acquire UI mutex - retrying later");
+                vTaskDelay(pdMS_TO_TICKS(100));
+                continue;
+            }
+            DEBUG_LOG_DISPLAY("Acquired UI mutex for transition");
+
+            // Then take the display driver lock
+            if (!driver->lockUI(pdMS_TO_TICKS(1000))) {
+                DEBUG_LOG_DISPLAY("Failed to acquire driver mutex - retrying later");
+                vTaskDelay(pdMS_TO_TICKS(100));
+                continue;
+            }
+            DEBUG_LOG_DISPLAY("Acquired driver mutex for transition");
+
+            // Clear any pending display updates
+            DisplayUpdateCommand cmd;
+            while (xQueueReceive(DisplayUpdateCommandQueue, &cmd, 0) == pdTRUE) {}
+
+            // Force finish any pending LVGL operations
+            lv_timer_handler();
+
+            // Initialize dashboard while holding both mutexes
+            if (!dashboardUI.begin()) {
+                DEBUG_LOG_DISPLAY("Dashboard initialization failed - retrying");
+                driver->unlockUI();
+                vTaskDelay(pdMS_TO_TICKS(100));
+                continue;
+            }
+
             needsScreenTransition = false;
-            DEBUG_LOG_DISPLAY("Screen transition complete");
-        }
+            currentState = DisplayState::DASHBOARD;
+            
+            // Release driver mutex
+            driver->unlockUI();
+            
+            DEBUG_LOG_DISPLAY("Screen transition complete and verified");
+            
+            // Force an initial update
+            updateDashboardValues();  // <-- Add this
 
-        // Process screen-specific logic
+            vTaskDelay(pdMS_TO_TICKS(50));
+            continue;
+        }   
+             // Process screen-specific logic
         switch (currentState) {
-            case DisplayState::BOOT:
-                break;
-
             case DisplayState::DASHBOARD:
-                // Process any pending UI commands
-                while (xQueueReceive(DisplayUpdateCommandQueue, &cmd, 0) == pdTRUE) {
-                    dashboardUI.update(
-                        cmd.temperature,
-                        cmd.currentSpeed,
-                        cmd.targetSpeed,
-                        cmd.controlMode,
-                        cmd.wifiConnected,
-                        cmd.mqttConnected,
-                        cmd.nightModeEnabled,
-                        cmd.nightModeActive
-                    );
+                DEBUG_LOG_DISPLAY("Starting dashboard update cycle");
+                
+                // Acquire mutex for dashboard updates
+                MutexGuard dashGuard(dashboardUI.getUIMutex(), pdMS_TO_TICKS(100));
+                if (!dashGuard.isLocked()) {
+                    DEBUG_LOG_DISPLAY("Failed to acquire mutex for dashboard updates - skipping cycle");
+                    break;
                 }
+                DEBUG_LOG_DISPLAY("Dashboard update acquired mutex");
+
+                // Process any pending UI commands
+                int commandsProcessed = 0;
+                while (xQueueReceive(DisplayUpdateCommandQueue, &cmd, 0) == pdTRUE) {
+                    commandsProcessed++;
+                    try {
+                        DEBUG_LOG_DISPLAY("Processing display update command");
+                        dashboardUI.update(
+                            cmd.temperature,
+                            cmd.currentSpeed,
+                            cmd.targetSpeed,
+                            cmd.controlMode,
+                            cmd.wifiConnected,
+                            cmd.mqttConnected,
+                            cmd.nightModeEnabled,
+                            cmd.nightModeActive
+                        );
+                    } catch (...) {
+                        DEBUG_LOG_DISPLAY("Exception during dashboard update");
+                    }
+                }
+                DEBUG_LOG_DISPLAY("Processed %d update commands", commandsProcessed);
+                DEBUG_LOG_DISPLAY("Dashboard update cycle complete");
                 
                 // Regular display updates
                 static uint32_t last_update = 0;
-                uint32_t now = millis();
                 if (now - last_update >= Config::Display::DisplayRender::UPDATE_INTERVAL) {
                     updateDashboardValues();
                     last_update = now;
@@ -200,16 +287,24 @@ void DisplayManager::switchToDashboardUI() {
         DEBUG_LOG_DISPLAY("Already in dashboard state");
         return;
     }
+
+    {   // Create new scope for mutex guard
+        MutexGuard guard(dashboardUI.getUIMutex(), pdMS_TO_TICKS(1000));
+        if (!guard.isLocked()) {
+            DEBUG_LOG_DISPLAY("Failed to acquire UI mutex for dashboard transition");
+            return;
+        }
     
-    DEBUG_LOG_DISPLAY("Requesting dashboard transition");
-    currentState = DisplayState::DASHBOARD;
-    needsScreenTransition = true;  // Request transition
+        DEBUG_LOG_DISPLAY("Requesting dashboard transition");
+        needsScreenTransition = true;
+    }   // Mutex is released here
+
+    // Now wait without holding the mutex
+    uint32_t startTime = millis();
+    while (needsScreenTransition && (millis() - startTime < 5000)) {
+        vTaskDelay(pdMS_TO_TICKS(10));  // Use vTaskDelay instead of delay
+    }
     
-    // Wait a bit to ensure transition is processed
-    delay(50);
-    
-    // Force an immediate update of the dashboard values
-    updateDashboardValues();
     DEBUG_LOG_DISPLAY("Dashboard switch requested");
 }
 
@@ -225,6 +320,7 @@ void DisplayManager::updateBootStatusDetail(const char* component,
     bootUI.updateStatusWithDetail(component, status, detail);
 }
 
+// In DisplayManager::updateDashboardValues():
 void DisplayManager::updateDashboardValues() {
     if (!initialized) return;
 
@@ -240,11 +336,10 @@ void DisplayManager::updateDashboardValues() {
         fanController.isNightModeActive()
     );
 
-    // Send to queue, with a short timeout
-    // We use a timeout of 0 to prevent blocking if queue is full
     if (xQueueSend(DisplayUpdateCommandQueue, &cmd, 0) != pdTRUE) {
-        // Optional: Add error handling if queue is full
-        // For now, we'll just skip this update
+        DEBUG_LOG_DISPLAY("Failed to queue dashboard update command");
+    } else {
+        DEBUG_LOG_DISPLAY("Dashboard update command queued successfully");
     }
 }
 

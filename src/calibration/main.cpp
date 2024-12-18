@@ -57,7 +57,7 @@ public:
         
         // Setup tachometer
         pinMode(TACH_PIN, INPUT_PULLUP);
-        attachInterrupt(digitalPinToInterrupt(TACH_PIN), handleTachInterrupt, FALLING);
+        attachInterrupt(digitalPinToInterrupt(TACH_PIN), handleTachInterrupt, RISING);
         
         // Start with fan off
         ledcWrite(PWM_CHANNEL, 0);

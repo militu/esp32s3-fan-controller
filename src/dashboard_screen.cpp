@@ -44,43 +44,51 @@ DashboardScreen::~DashboardScreen() {
  * Core UI Management
  ******************************************************************************/
 
-void DashboardScreen::begin() {
-    if (initialized) return;
+bool DashboardScreen::begin() {
+    DEBUG_LOG_DISPLAY("Dashboard begin entry - Task: 0x%lx", (unsigned long)xTaskGetCurrentTaskHandle());
     
-    // Create the screen first but don't load it yet
+    if (initialized) {
+        DEBUG_LOG_DISPLAY("Dashboard already initialized");
+        return true;
+    }
+    
+    // Create the screen
     createMainScreen();
-    
-    // Calculate base dimensions and spacing
+    if (!screen) {
+        DEBUG_LOG_DISPLAY("Failed to create main screen");
+        return false;
+    }
+
+    // Calculate dimensions
     uint16_t margin = displayWidth * Config::Display::Dashboard::MARGIN_TO_WIDTH_RATIO;
     uint16_t topBarHeight = displayHeight * Config::Display::Dashboard::TopBar::HEIGHT_TO_SCREEN_RATIO;
     
-    // Create all UI elements
+    // Create UI elements
     createTopStatusBar(topBarHeight);
-    
-    // Calculate main content area dimensions
-    uint16_t contentStartY = topBarHeight + margin;
-    uint16_t contentHeight = displayHeight - contentStartY - margin;
-    
-    // Create main content
-    createMainContent(contentStartY, contentHeight);
-    
+    createMainContent(topBarHeight + margin, displayHeight - topBarHeight - margin * 2);
+
     // Make sure all animations are stopped and initial values are set
     tempAnimationInProgress = false;
     currentSpeedAnimationInProgress = false;
     currentTempValue = 0;
     targetSpeedValue = 0;
     
-    delay(1000);  // Give LVGL time to finish any pending operations
-    // Now that everything is initialized, load the screen
+    // Wait for any pending LVGL operations
+    delay(10);
+
+    // Load the screen
     lv_scr_load(screen);
+    delay(50); // Give time for the screen to load
     
-    // Mark as initialized after screen is loaded
     initialized = true;
+    DEBUG_LOG_DISPLAY("Dashboard initialization complete");
+    return true;
 }
 
 void DashboardScreen::init(uint16_t width, uint16_t height) {
     displayWidth = width;
     displayHeight = height;
+    DEBUG_LOG_DISPLAY("Dashboard screen initialized with dimensions: %dx%d", width, height);
 }
 
 void DashboardScreen::update(float temp, int fanSpeed, int targetSpeed, FanController::Mode mode,
@@ -91,6 +99,12 @@ void DashboardScreen::update(float temp, int fanSpeed, int targetSpeed, FanContr
     updateStatusIndicators(wifiConnected, mqttConnected, nightModeEnabled, nightModeActive);
     updateSpeedDisplay(fanSpeed, targetSpeed);
     updateModeDisplay(mode);
+}
+
+bool DashboardScreen::isInitialized() const {
+    MutexGuard guard(uiMutex);
+    if (!guard.isLocked()) return false;
+    return initialized && screen != nullptr;
 }
 
 /*******************************************************************************
@@ -133,11 +147,16 @@ void DashboardScreen::createTopStatusBar(uint16_t height) {
 
 void DashboardScreen::createMainScreen() {
     screen = lv_obj_create(NULL);
+    if (!screen) {
+        DEBUG_LOG_DISPLAY("Failed to create screen object");
+        return;
+    }
+
     lv_obj_set_scrollbar_mode(screen, LV_SCROLLBAR_MODE_OFF);
     
     // Match boot screen's gradient background
-    lv_obj_set_style_bg_color(screen, lv_color_hex(0x101020), LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_grad_color(screen, lv_color_hex(0x202040), LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_color(screen, lv_color_hex(DisplayColors::BG_DARK), LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_grad_color(screen, lv_color_hex(DisplayColors::BG_LIGHT), LV_STATE_DEFAULT);
     lv_obj_set_style_bg_grad_dir(screen, LV_GRAD_DIR_VER, LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, LV_STATE_DEFAULT);
 }
@@ -145,9 +164,7 @@ void DashboardScreen::createMainScreen() {
 void DashboardScreen::createMainContent(uint16_t startY, uint16_t height) {
     // Calculate optimal dimensions
     uint16_t meterSize = displayWidth * Config::Display::Dashboard::Meters::METER_SIZE_RATIO;
-    // Calculate total remaining space
     uint16_t remainingSpace = displayWidth - (meterSize * 2);
-    // Divide it into thirds
     uint16_t thirdSpace = remainingSpace / 3;
 
     uint16_t margin = thirdSpace; 
@@ -164,6 +181,10 @@ void DashboardScreen::createMainContent(uint16_t startY, uint16_t height) {
 void DashboardScreen::createTemperatureMeter(uint16_t size, uint16_t xPosFromLeft) {
     // Create and setup container
     lv_obj_t* meter_container = lv_obj_create(screen);
+    if (!meter_container) {
+        DEBUG_LOG_DISPLAY("Failed to create temperature container");
+        return;
+    }
     lv_obj_remove_style_all(meter_container);
         
     // Set container properties
@@ -173,13 +194,18 @@ void DashboardScreen::createTemperatureMeter(uint16_t size, uint16_t xPosFromLef
     lv_obj_set_style_pad_all(meter_container, 0, LV_STATE_DEFAULT);
     
     // Center the container
-    lv_obj_align(meter_container, LV_ALIGN_BOTTOM_LEFT, xPosFromLeft, size * Config::Display::Dashboard::Meters::BOTTOM_OFFSET_RATIO);
+    lv_obj_align(meter_container, LV_ALIGN_BOTTOM_LEFT, xPosFromLeft, 
+                 size * Config::Display::Dashboard::Meters::BOTTOM_OFFSET_RATIO);
     lv_obj_update_layout(meter_container);
     
     uint16_t widget_size = size * Config::Display::Dashboard::Meters::WIDGET_TO_CONTAINER_RATIO;
 
     // Create and setup temperature meter
     tempMeter = lv_meter_create(meter_container);
+    if (!tempMeter) {
+        DEBUG_LOG_DISPLAY("Failed to create temperature meter");
+        return;
+    }
     // Remove default styles
     lv_obj_remove_style(tempMeter, NULL, LV_PART_INDICATOR);
     lv_obj_remove_style(tempMeter, NULL, LV_PART_MAIN);
@@ -208,36 +234,33 @@ void DashboardScreen::createTemperatureMeter(uint16_t size, uint16_t xPosFromLef
                             Config::Display::Dashboard::Meters::Temperature::MIN_TEMP,
                             Config::Display::Dashboard::Meters::Temperature::MAX_TEMP, 
                             angle_range, angle_offset);
-    lv_arc_set_value(arcTempMeter, Config::Display::Dashboard::Meters::Temperature::MIN_TEMP);
-
+    
     // Create and setup background arc
     arcTempMeter = lv_arc_create(meter_container);
     lv_obj_set_size(arcTempMeter, widget_size, widget_size);
     lv_obj_clear_flag(arcTempMeter, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_PRESS_LOCK | 
                      LV_OBJ_FLAG_CLICK_FOCUSABLE | LV_OBJ_FLAG_GESTURE_BUBBLE | 
                      LV_OBJ_FLAG_SNAPPABLE | LV_OBJ_FLAG_SCROLLABLE | 
-                     LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM | 
-                     LV_OBJ_FLAG_SCROLL_CHAIN);
+                     LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM);
 
     // Remove arc knob and background
-    lv_obj_set_style_bg_opa(arcTempMeter, 0, LV_PART_KNOB);  // Hide knob
-    lv_obj_set_style_arc_opa(arcTempMeter, 0, LV_PART_MAIN); // Hide background arc
-    lv_obj_set_style_arc_rounded(arcTempMeter, false, LV_PART_INDICATOR); // Remove rounded ends
+    lv_obj_set_style_bg_opa(arcTempMeter, 0, LV_PART_KNOB);
+    lv_obj_set_style_arc_opa(arcTempMeter, 0, LV_PART_MAIN);
+    lv_obj_set_style_arc_rounded(arcTempMeter, false, LV_PART_INDICATOR);
     
-    // Set arc properties and align with meter scale
+    // Set arc properties
     lv_obj_set_style_arc_opa(arcTempMeter, 255, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_img_src(arcTempMeter, &ui_img_gradient_225_170px_png, LV_PART_INDICATOR | LV_STATE_DEFAULT);
     lv_obj_set_style_arc_width(arcTempMeter, widget_size * Config::Display::Dashboard::Meters::Temperature::SCALE_THICKNESS_RATIO, LV_PART_INDICATOR);
     
     // Configure arc angles to match the meter scale
     lv_arc_set_rotation(arcTempMeter, angle_offset);
     lv_arc_set_bg_angles(arcTempMeter, 0, angle_range);
-    lv_arc_set_angles(arcTempMeter, 0, 0); // Initial value
+    lv_arc_set_angles(arcTempMeter, 0, 0);
     
-    // Set arc range to match the meter
+    // Set arc range
     lv_arc_set_range(arcTempMeter, 
-                     Config::Display::Dashboard::Meters::Temperature::MIN_TEMP * 2,  // Multiply by 2 since we're using half-degree precision
-                     Config::Display::Dashboard::Meters::Temperature::MAX_TEMP * 2); // Multiply by 2 since we're using half-degree precision
+                     Config::Display::Dashboard::Meters::Temperature::MIN_TEMP * 2,
+                     Config::Display::Dashboard::Meters::Temperature::MAX_TEMP * 2);
     
     lv_obj_center(arcTempMeter);
     lv_obj_move_background(arcTempMeter);
@@ -338,9 +361,6 @@ lv_obj_t* DashboardScreen::createStatusLabel(lv_obj_t* parent, lv_align_t align,
  ******************************************************************************/
 
 void DashboardScreen::updateTemperatureDisplay(float temp) {
-    MutexGuard guard(uiMutex, pdMS_TO_TICKS(10));
-    if (!guard.isLocked()) return;
-
     int targetValue = constrain((int)(temp * 2), 
         Config::Display::Dashboard::Meters::Temperature::MIN_TEMP * 2,
         Config::Display::Dashboard::Meters::Temperature::MAX_TEMP * 2);
@@ -383,8 +403,6 @@ void DashboardScreen::updateTemperatureDisplay(float temp) {
 
 void DashboardScreen::updateStatusIndicators(bool wifiConnected, bool mqttConnected, 
                                              bool nightModeEnabled, bool nightModeActive) {
-    MutexGuard guard(uiMutex, pdMS_TO_TICKS(10));
-    if (!guard.isLocked()) return;
 
     // Update WiFi status with proper colors
     lv_obj_set_style_text_color(wifiLabel, 
@@ -410,9 +428,6 @@ void DashboardScreen::updateStatusIndicators(bool wifiConnected, bool mqttConnec
 }
 
 void DashboardScreen::updateSpeedDisplay(int fanSpeed, int targetSpeed) {
-    MutexGuard guard(uiMutex, pdMS_TO_TICKS(10));
-    if (!guard.isLocked()) return;
-
     if (!currentSpeedAnimationInProgress && fanSpeed != currentSpeedValue) {
         lv_anim_t anim;
         lv_anim_init(&anim);
@@ -464,9 +479,6 @@ void DashboardScreen::updateSpeedDisplay(int fanSpeed, int targetSpeed) {
 }
 
 void DashboardScreen::updateModeDisplay(FanController::Mode mode) {
-    MutexGuard guard(uiMutex, pdMS_TO_TICKS(10));
-    if (!guard.isLocked()) return;
-    
     lv_label_set_text(modeIndicator, mode == FanController::Mode::AUTO ? "AUTO" : "MANUAL");
     lv_obj_set_style_text_color(modeIndicator, 
         mode == FanController::Mode::AUTO ? lv_color_hex(DisplayColors::SUCCESS) : lv_color_hex(DisplayColors::TEMP_WARNING),

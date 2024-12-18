@@ -32,8 +32,11 @@ bool ILI9341Hardware::initialize() {
     tft->begin();
     tft->setRotation(1);
 
-    // Initialize LVGL
-    lv_init();
+    static bool lvgl_initialized = false;
+    if (!lvgl_initialized) {
+        lv_init();
+        lvgl_initialized = true;
+    }
 
     static lv_disp_draw_buf_t draw_buf;
     static lv_color_t* buf1 = (lv_color_t*)heap_caps_malloc(config.width * 40 * sizeof(lv_color_t), MALLOC_CAP_DMA);
